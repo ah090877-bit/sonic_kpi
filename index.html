@@ -11,12 +11,14 @@
   <div id="loader" class="loader-container"><div class="spinner"></div><p>ERP 동기화 중...</p></div>
   
   <div class="app-wrapper" style="display: none;" id="app">
-    <!-- 좌측 화주사 선택 사이드바 -->
+    <!-- 좌측 뷰 선택 사이드바 -->
     <aside class="sidebar">
       <div class="sidebar-logo"><h2>유진소닉</h2></div>
-      <div class="sidebar-menu-title">화주사 리스트</div>
-      <ul class="client-list" id="client-list">
-        <!-- 자바스크립트가 데이터를 읽고 화주사 목록을 이곳에 만듭니다 -->
+      <div class="sidebar-menu-title">실적 분석 뷰(View)</div>
+      <ul class="nav-list">
+        <li class="nav-item active" data-view="hq">🏢 본부별 실적 요약</li>
+        <li class="nav-item" data-view="team">👥 팀별 실적 요약</li>
+        <li class="nav-item" data-view="client">🤝 화주사별 상세 실적</li>
       </ul>
     </aside>
 
@@ -27,65 +29,68 @@
         <button class="btn-refresh" onclick="fetchData()">데이터 새로고침</button>
       </header>
 
-      <!-- 상단 팀/기간 필터 -->
+      <!-- 상단 기간 및 조직 필터 -->
       <div class="filter-bar">
         <div class="filter-group"><label>연도</label><select id="f-year"></select></div>
         <div class="filter-group"><label>월</label><select id="f-month"></select></div>
         <div class="filter-group"><label>본부</label><select id="f-hq"></select></div>
-        <div class="filter-group"><label>조직(팀)</label><select id="f-team"></select></div>
+        <div class="filter-group"><label>팀</label><select id="f-team"></select></div>
       </div>
 
       <div class="scroll-area">
-        <!-- 핵심 KPI 지표 (요청하신 계산식 적용) -->
+        <!-- 핵심 KPI 지표 (전년비 포함) -->
         <div class="kpi-grid">
           <div class="kpi-card">
-            <h3>총 매출</h3>
+            <h3>총 매출액</h3>
             <p id="kpi-rev">-</p>
-            <div class="sub-kpi">운송: <span id="kpi-rev-trans">-</span> | 지입: <span id="kpi-rev-lease">-</span></div>
+            <div class="yoy-badge" id="kpi-rev-yoy">전년비: -</div>
           </div>
           <div class="kpi-card">
             <h3>변동원가</h3>
             <p id="kpi-var-cost">-</p>
-            <div class="sub-kpi">매출 대비 변동비용</div>
+            <div class="sub-kpi">운송/지입 등 변동비</div>
           </div>
           <div class="kpi-card highlight-card">
             <h3>공헌이익</h3>
             <p id="kpi-cm">-</p>
-            <div class="sub-kpi">공헌이익률: <b id="kpi-cm-ratio">-</b></div>
+            <div class="sub-kpi">이익률: <b id="kpi-cm-ratio">-</b></div>
           </div>
           <div class="kpi-card">
             <h3>고정원가</h3>
             <p id="kpi-fix-cost">-</p>
-            <div class="sub-kpi">판매비 및 일반관리비 등</div>
+            <div class="sub-kpi">판관비/고정비</div>
           </div>
           <div class="kpi-card highlight-card">
             <h3>매출이익</h3>
             <p id="kpi-gp">-</p>
-            <div class="sub-kpi">매출이익률: <b id="kpi-gp-ratio">-</b></div>
+            <div class="yoy-badge" id="kpi-gp-yoy" style="margin-top: 5px;">전년비: -</div>
+            <div class="sub-kpi">이익률: <b id="kpi-gp-ratio">-</b></div>
           </div>
         </div>
         
         <!-- 차트 영역 -->
         <div class="chart-layout">
           <div class="chart-box large-chart">
-            <div class="box-header"><h4>월별 이익 구조 추이</h4><span class="subtitle">매출, 공헌이익, 매출이익 비교 (단위: 백만원)</span></div>
-            <canvas id="chart-monthly-trend"></canvas>
+            <div class="box-header"><h4>전년 대비 당해 연도 매출 추이</h4><span class="subtitle">선택된 기간 기준 비교</span></div>
+            <canvas id="chart-yoy-trend"></canvas>
           </div>
           <div class="chart-box small-chart">
-            <div class="box-header"><h4>비용 및 이익률 구조</h4><span class="subtitle">해당 화주사/팀의 원가 비중</span></div>
+            <div class="box-header"><h4>당기 비용 및 이익 구조</h4><span class="subtitle">매출액 대비 구성비</span></div>
             <canvas id="chart-cost-structure"></canvas>
           </div>
         </div>
 
         <!-- 세부 리포트 테이블 -->
         <div class="table-container">
-          <div class="box-header"><h4>세부 실적 리포트</h4><span class="subtitle">선택된 화주사 및 팀 기준 상세내역 (단위: 백만원)</span></div>
-          <table class="data-table" id="detail-table">
-            <thead>
-              <tr><th>연-월</th><th>본부</th><th>팀</th><th>화주사</th><th>거래단위</th><th>매출액</th><th>변동원가</th><th>공헌이익</th><th>고정원가</th><th>매출이익</th></tr>
-            </thead>
-            <tbody></tbody>
-          </table>
+          <div class="box-header"><h4 id="table-title">세부 실적 리포트</h4><span class="subtitle">모든 금액 단위: 원 (₩)</span></div>
+          <div class="table-scroll">
+            <table class="data-table" id="detail-table">
+              <thead id="detail-table-head">
+                <!-- 자바스크립트에서 뷰(View)에 따라 자동 생성 -->
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
