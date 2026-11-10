@@ -1,5 +1,5 @@
 // ★ 반드시 새로 배포하여 발급받은 최신 URL로 수정해 주세요!
-const API_URL = '여기에_새_웹앱_URL을_붙여넣으세요';
+const API_URL = 'https://script.google.com/macros/s/AKfycbxoRToFFWcjmzjxxYkvPHourAy9C3FxTBWzoASIgiKBWkyofecavJCVyCo8hRy306gq/exec';
 
 let rawData = [];
 let chartInstances = {};
