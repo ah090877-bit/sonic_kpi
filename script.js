@@ -1,4 +1,3 @@
-// ★ 기존 URL 그대로 둡니다!
 const API_URL = 'https://script.google.com/macros/s/AKfycbxoRToFFWcjmzjxxYkvPHourAy9C3FxTBWzoASIgiKBWkyofecavJCVyCo8hRy306gq/exec';
 
 let rawData = [];
@@ -17,7 +16,6 @@ function initApp(response) {
   if (!response.success) { alert("오류: " + response.error); return; }
   
   rawData = response.data.filter(d => d.client !== '화주공통비');
-  
   const years = [...new Set(rawData.map(d => d.y))].sort((a,b)=>b-a);
   if(years.length > 0) state.year = years[0].toString();
   
@@ -120,10 +118,21 @@ function renderSummaryView() {
   applyYoYBadge('sum-kpi-yoy-rev', currStats.revTotal, prevStats.revTotal);
   applyYoYBadge('sum-kpi-yoy-gp', currStats.gp, prevStats.gp);
 
+  // 차트 렌더링 세팅 (범례 패딩 추가로 잘림 방지 완벽 대응)
   Chart.defaults.font.family = "'Noto Sans KR', sans-serif";
   const render = (id, type, dts, opt) => {
     if (chartInstances[id]) chartInstances[id].destroy();
-    chartInstances[id] = new Chart(document.getElementById(id), { type, data: dts, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, ...opt } });
+    chartInstances[id] = new Chart(document.getElementById(id), { 
+      type, 
+      data: dts, 
+      options: { 
+        responsive: true, 
+        maintainAspectRatio: false, 
+        layout: { padding: { bottom: 15 } }, // 하단 여백 추가
+        plugins: { legend: { position: 'bottom', labels: { padding: 15 } } }, // 범례 여백 추가
+        ...opt 
+      } 
+    });
   };
 
   const mCurrRev = Array(12).fill(0), mPrevRev = Array(12).fill(0);
@@ -218,24 +227,51 @@ function renderSingleClientDetail() {
   const annualCurr = rawData.filter(d => d.y === currYear && d.client === clientName);
   const annualPrev = rawData.filter(d => d.y === currYear - 1 && d.client === clientName);
   
-  const m1Rev = Array(12).fill(0), m1CM = Array(12).fill(0), m1GP = Array(12).fill(0);
-  annualCurr.forEach(d => { const i = d.m-1; if(d.type==='매출'){ m1Rev[i]+=d.amt; m1CM[i]+=d.amt; m1GP[i]+=d.amt; } else if(d.type==='변동원가'){ m1CM[i]-=d.amt; m1GP[i]-=d.amt; } else if(d.type==='고정원가') m1GP[i]-=d.amt; });
+  const m1Rev = Array(12).fill(0), m1CM = Array(12).fill(0), m1GP = Array(12).fill(0), m1GPRate = Array(12).fill(0);
+  annualCurr.forEach(d => { 
+    const i = d.m-1; 
+    if(d.type==='매출'){ m1Rev[i]+=d.amt; m1CM[i]+=d.amt; m1GP[i]+=d.amt; } 
+    else if(d.type==='변동원가'){ m1CM[i]-=d.amt; m1GP[i]-=d.amt; } 
+    else if(d.type==='고정원가') m1GP[i]-=d.amt; 
+  });
+  
+  // ★ 요청하신 매출이익률 배열 계산
+  for(let i=0; i<12; i++) {
+    m1GPRate[i] = m1Rev[i] === 0 ? 0 : (m1GP[i] / m1Rev[i]) * 100;
+  }
+  
   const m2Rev = Array(12).fill(0);
   annualPrev.forEach(d => { if(d.type==='매출') m2Rev[d.m-1]+=d.amt; });
 
   Chart.defaults.font.family = "'Noto Sans KR', sans-serif";
   const render = (id, type, dts, opt) => {
     if (chartInstances[id]) chartInstances[id].destroy();
-    chartInstances[id] = new Chart(document.getElementById(id), { type, data: dts, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, ...opt } });
+    chartInstances[id] = new Chart(document.getElementById(id), { 
+      type, data: dts, 
+      options: { 
+        responsive: true, 
+        maintainAspectRatio: false, 
+        layout: { padding: { bottom: 15 } },
+        plugins: { legend: { position: 'bottom', labels: { padding: 15 } } }, 
+        ...opt 
+      } 
+    });
   };
 
+  // ★ 이중 Y축(매출이익률 표시) 차트 렌더링
   render('det-chart-trend', 'line', {
     labels: ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'],
     datasets: [
-      { label: '매출', data: m1Rev, borderColor: '#B0BEC5', backgroundColor: 'transparent', tension: 0.3, borderDash: [5,5] },
-      { label: '공헌이익', data: m1CM, borderColor: '#00A6B2', backgroundColor: '#00A6B2', tension: 0.3, borderWidth: 3 },
-      { label: '매출이익', data: m1GP, borderColor: '#F39C12', backgroundColor: '#F39C12', tension: 0.3, borderWidth: 3 }
+      { label: '매출', data: m1Rev, borderColor: '#B0BEC5', backgroundColor: 'transparent', tension: 0.3, borderDash: [5,5], yAxisID: 'y' },
+      { label: '공헌이익', data: m1CM, borderColor: '#00A6B2', backgroundColor: '#00A6B2', tension: 0.3, borderWidth: 3, yAxisID: 'y' },
+      { label: '매출이익', data: m1GP, borderColor: '#F39C12', backgroundColor: '#F39C12', tension: 0.3, borderWidth: 3, yAxisID: 'y' },
+      { label: '매출이익률(%)', data: m1GPRate, borderColor: '#E74C3C', backgroundColor: '#E74C3C', tension: 0.3, borderWidth: 2, pointRadius: 4, yAxisID: 'y1' } // 이익률 라인 추가
     ]
+  }, {
+    scales: {
+      y: { type: 'linear', display: true, position: 'left' },
+      y1: { type: 'linear', display: true, position: 'right', grid: { drawOnChartArea: false }, ticks: { callback: v => v + '%' } } // 우측 % 축
+    }
   });
 
   render('det-chart-yoy', 'bar', {
@@ -246,7 +282,6 @@ function renderSingleClientDetail() {
     ]
   });
 
-  // ★ 추가된 월별 리포트 그리기 로직
   const detTbody = document.querySelector('#det-table tbody');
   detTbody.innerHTML = '';
   
