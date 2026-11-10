@@ -7,45 +7,77 @@ const state = { view: 'hq', year: 'All', month: 'All', hq: 'All', team: 'All', c
 const formatMoney = (val) => val.toLocaleString('ko-KR');
 
 function fetchData() {
-  document.getElementById('loader').style.display = 'flex';
+  const loader = document.getElementById('loader');
+  loader.style.display = 'flex';
+  loader.innerHTML = '<div class="spinner"></div><p>ERP 데이터 동기화 중...</p>';
   document.getElementById('app').style.display = 'none';
-  fetch(API_URL).then(res => res.json()).then(data => initApp(data)).catch(err => alert("데이터 에러: " + err));
+  
+  fetch(API_URL)
+    .then(res => res.json())
+    .then(data => initApp(data))
+    .catch(err => {
+      loader.innerHTML = `
+        <div style="background:#FFF1F0; border:1px solid #FFA39E; padding:30px; border-radius:10px; text-align:center;">
+          <h3 style="color:#CF1322; margin-bottom:15px;">🚨 구글 시트 연결 실패 (Network Error)</h3>
+          <p style="font-weight:bold; font-size:16px;">${err}</p>
+          <p style="margin-top:15px; color:#555;">구글 스크립트 권한 문제(모든 사용자 설정 필요)이거나 주소가 잘못되었습니다.</p>
+        </div>`;
+    });
 }
 
 function initApp(response) {
-  if (!response.success) { alert("오류: " + response.error); return; }
+  const loader = document.getElementById('loader');
   
-  let fetchedData = response.data.filter(d => d.client !== '화주공통비');
+  if (!response.success) { 
+    loader.innerHTML = `
+      <div style="background:#FFF1F0; border:1px solid #FFA39E; padding:30px; border-radius:10px; text-align:center;">
+        <h3 style="color:#CF1322; margin-bottom:15px;">🚨 데이터 로드 오류</h3>
+        <p style="font-weight:bold;">${response.error}</p>
+      </div>`;
+    return; 
+  }
   
-  // ★ 요청사항: 조직 이동(리테일1->2팀) 대비, 화주사의 소속을 무조건 "가장 최근 달" 기준으로 통일!
-  const latestOrgMap = {};
-  fetchedData.sort((a, b) => {
-    if (a.y !== b.y) return a.y - b.y;
-    return a.m - b.m;
-  }).forEach(d => {
-    // 날짜순으로 덮어쓰므로 결국 가장 마지막(최신) 소속이 남게 됨
-    latestOrgMap[d.client] = { hq: d.hq, team: d.team };
-  });
+  try {
+    let fetchedData = response.data.filter(d => d.client !== '화주공통비');
+    
+    // 조직 이동 대비 최신 소속 업데이트
+    const latestOrgMap = {};
+    fetchedData.sort((a, b) => {
+      if (a.y !== b.y) return a.y - b.y;
+      return a.m - b.m;
+    }).forEach(d => {
+      latestOrgMap[d.client] = { hq: d.hq, team: d.team };
+    });
 
-  // 모든 과거 데이터의 소속을 최신 소속으로 업데이트
-  fetchedData.forEach(d => {
-    if (latestOrgMap[d.client]) {
-      d.hq = latestOrgMap[d.client].hq;
-      d.team = latestOrgMap[d.client].team;
-    }
-  });
-  
-  rawData = fetchedData; // 통일된 데이터를 원본으로 사용
+    fetchedData.forEach(d => {
+      if (latestOrgMap[d.client]) {
+        d.hq = latestOrgMap[d.client].hq;
+        d.team = latestOrgMap[d.client].team;
+      }
+    });
+    
+    rawData = fetchedData; 
 
-  const years = [...new Set(rawData.map(d => d.y))].sort((a,b)=>b-a);
-  if(years.length > 0) state.year = years[0].toString();
-  
-  setupSidebar();
-  buildTopFilters();
-  updateDashboard();
-  
-  document.getElementById('loader').style.display = 'none';
-  document.getElementById('app').style.display = 'flex';
+    const years = [...new Set(rawData.map(d => d.y))].sort((a,b)=>b-a);
+    if(years.length > 0) state.year = years[0].toString();
+    
+    setupSidebar();
+    buildTopFilters();
+    updateDashboard();
+    
+    // 에러 없이 완벽하게 실행되었을 때만 로딩창을 끕니다.
+    loader.style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+    
+  } catch (e) {
+    // 자바스크립트 구문 오류가 발생하면 멈추지 않고 빨간창으로 알려줍니다.
+    loader.innerHTML = `
+      <div style="background:#FFF1F0; border:1px solid #FFA39E; padding:30px; border-radius:10px; text-align:center;">
+        <h3 style="color:#CF1322; margin-bottom:15px;">🚨 화면 출력 오류 (Javascript Error)</h3>
+        <p style="font-weight:bold; font-size:16px;">${e.name} : ${e.message}</p>
+        <p style="margin-top:15px; color:#555;">index.html 파일과 script.js 파일이 짝이 안 맞습니다.<br>Ctrl + F5를 눌러 강력 새로고침을 진행해 보세요.</p>
+      </div>`;
+  }
 }
 
 function setupSidebar() {
@@ -326,4 +358,142 @@ function renderSingleClientDetail() {
     const cData = annualCurr.filter(d => d.m === m);
     const pData = annualPrev.filter(d => d.m === m);
     
-    let cRev = 0, c
+    let cRev = 0, cTrans = 0, cLease = 0, cVar = 0, cFix = 0;
+    cData.forEach(d => {
+      if (d.type === '매출') { cRev += d.amt; if (d.subject === '지입료수입') cLease += d.amt; else cTrans += d.amt; }
+      else if (d.type === '변동원가') cVar += d.amt;
+      else if (d.type === '고정원가') cFix += d.amt;
+    });
+    
+    let pRev = 0;
+    pData.forEach(d => { if (d.type === '매출') pRev += d.amt; });
+    
+    if (cRev === 0 && pRev === 0 && cVar === 0 && cFix === 0) continue;
+    
+    let yoyTxt = '-'; let yoyColor = 'inherit';
+    if (pRev > 0) {
+      const ratio = ((cRev - pRev) / pRev) * 100;
+      yoyTxt = ratio > 0 ? `▲ ${ratio.toFixed(1)}%` : (ratio < 0 ? `▼ ${Math.abs(ratio).toFixed(1)}%` : '-');
+      yoyColor = ratio > 0 ? '#2E7D32' : (ratio < 0 ? '#C62828' : 'inherit');
+    }
+    
+    const cm = cRev - cVar;
+    const cmRatio = cRev === 0 ? 0 : (cm / cRev) * 100;
+    const gp = cm - cFix;
+    const gpRatio = cRev === 0 ? 0 : (gp / cRev) * 100;
+    
+    let trHtml = `
+      <td class="text-center">${m}월</td>
+      <td style="font-weight:900;">${formatMoney(cRev)}</td>
+      <td style="color:#6C757D;">${formatMoney(pRev)}</td>
+      <td style="color:${yoyColor}; font-weight:900;">${yoyTxt}</td>
+      <td>${formatMoney(cTrans)}</td>
+      <td>${formatMoney(cLease)}</td>
+      <td>${formatMoney(cVar)}</td>
+      <td style="color:#00A6B2; font-weight:900;">${formatMoney(cm)}</td>
+      <td style="font-size:12px; color:#6C757D;">${cmRatio.toFixed(1)}%</td>
+      <td>${formatMoney(cFix)}</td>
+      <td style="color:${gp < 0 ? '#DC3545' : '#212529'}; font-weight:900;">${formatMoney(gp)}</td>
+      <td style="font-size:12px; color:#6C757D;">${gpRatio.toFixed(1)}%</td>
+    `;
+    const tr = document.createElement('tr'); 
+    tr.innerHTML = trHtml; 
+    detTbody.appendChild(tr);
+  }
+}
+
+function goBackToCards() {
+  state.clientView = 'All';
+  updateDashboard();
+}
+
+function calculateStats(data) {
+  let res = { revTotal: 0, revTrans: 0, revLease: 0, varC: 0, fixC: 0, cm: 0, gp: 0 };
+  data.forEach(d => {
+    if (d.type === '매출') { res.revTotal += d.amt; if (d.subject === '지입료수입') res.revLease += d.amt; else res.revTrans += d.amt; } 
+    else if (d.type === '변동원가') res.varC += d.amt;
+    else if (d.type === '고정원가') res.fixC += d.amt;
+  });
+  res.cm = res.revTotal - res.varC; res.gp = res.cm - res.fixC;
+  return res;
+}
+
+function applyYoYBadge(elementId, currVal, prevVal) {
+  const el = document.getElementById(elementId);
+  if (prevVal === 0) { el.innerText = '전년비 -'; el.className = 'yoy-badge yoy-none'; return; }
+  const ratio = ((currVal - prevVal) / prevVal) * 100;
+  if (ratio > 0) { el.innerText = `▲ ${ratio.toFixed(1)}%`; el.className = 'yoy-badge yoy-up'; } 
+  else if (ratio < 0) { el.innerText = `▼ ${Math.abs(ratio).toFixed(1)}%`; el.className = 'yoy-badge yoy-down'; } 
+  else { el.innerText = '-'; el.className = 'yoy-badge yoy-none'; }
+}
+
+function drawTable(currData, prevData) {
+  const head = document.getElementById('sum-table-head');
+  const tbody = document.querySelector('#sum-table tbody');
+  
+  let headHtml = '<tr>';
+  if (state.view === 'hq') headHtml += '<th>조직(본부)</th>';
+  else headHtml += '<th>본부</th><th>팀</th>';
+  
+  headHtml += `
+    <th>당기 매출</th><th>전년 동기 매출</th><th>증감률</th>
+    <th>운송수입</th><th>지입료수입</th><th>변동원가</th>
+    <th>공헌이익</th><th>공헌이익률</th><th>고정원가</th><th>매출이익</th><th>매출이익률</th>
+  </tr>`;
+  head.innerHTML = headHtml;
+  tbody.innerHTML = '';
+
+  const summary = {};
+  const groupData = (data, isPrev) => {
+    data.forEach(d => {
+      let key = d.hq;
+      if (state.view === 'team') key += `|${d.team}`;
+      if (!summary[key]) summary[key] = { hq: d.hq, team: d.team, currRev: 0, prevRev: 0, trans: 0, lease: 0, varC: 0, fixC: 0 };
+      if (isPrev) { if (d.type === '매출') summary[key].prevRev += d.amt; } 
+      else {
+        if (d.type === '매출') { summary[key].currRev += d.amt; if(d.subject === '지입료수입') summary[key].lease += d.amt; else summary[key].trans += d.amt; }
+        else if (d.type === '변동원가') summary[key].varC += d.amt;
+        else if (d.type === '고정원가') summary[key].fixC += d.amt;
+      }
+    });
+  };
+
+  groupData(prevData, true);
+  groupData(currData, false);
+
+  Object.values(summary).forEach(row => {
+    if (row.currRev === 0 && row.prevRev === 0 && row.varC === 0 && row.fixC === 0) return; 
+    
+    let yoyTxt = '-'; let yoyColor = 'inherit';
+    if (row.prevRev > 0) {
+      const ratio = ((row.currRev - row.prevRev) / row.prevRev) * 100;
+      yoyTxt = ratio > 0 ? `▲ ${ratio.toFixed(1)}%` : (ratio < 0 ? `▼ ${Math.abs(ratio).toFixed(1)}%` : '-');
+      yoyColor = ratio > 0 ? '#2E7D32' : (ratio < 0 ? '#C62828' : 'inherit');
+    }
+
+    const cm = row.currRev - row.varC;
+    const cmRatio = row.currRev === 0 ? 0 : (cm / row.currRev) * 100;
+    const gp = cm - row.fixC;
+    const gpRatio = row.currRev === 0 ? 0 : (gp / row.currRev) * 100;
+    
+    let trHtml = `<td class="text-center">${row.hq}</td>`;
+    if (state.view === 'team') trHtml += `<td class="text-center">${row.team}</td>`;
+
+    trHtml += `
+      <td style="font-weight:900;">${formatMoney(row.currRev)}</td>
+      <td style="color:#6C757D;">${formatMoney(row.prevRev)}</td>
+      <td style="color:${yoyColor}; font-weight:900;">${yoyTxt}</td>
+      <td>${formatMoney(row.trans)}</td>
+      <td>${formatMoney(row.lease)}</td>
+      <td>${formatMoney(row.varC)}</td>
+      <td style="color:#00A6B2; font-weight:900;">${formatMoney(cm)}</td>
+      <td style="font-size:12px; color:#6C757D;">${cmRatio.toFixed(1)}%</td>
+      <td>${formatMoney(row.fixC)}</td>
+      <td style="color:${gp < 0 ? '#DC3545' : '#212529'}; font-weight:900;">${formatMoney(gp)}</td>
+      <td style="font-size:12px; color:#6C757D;">${gpRatio.toFixed(1)}%</td>
+    `;
+    const tr = document.createElement('tr'); tr.innerHTML = trHtml; tbody.appendChild(tr);
+  });
+}
+
+window.onload = fetchData;
