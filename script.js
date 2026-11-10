@@ -101,6 +101,23 @@ function updateDashboard() {
   }
 }
 
+// 🌟 차트 렌더링 통합 관리 (옵션 병합 처리)
+function renderChart(id, type, dts, opt = {}) {
+  if (chartInstances[id]) chartInstances[id].destroy();
+  
+  let defaultPlugins = { legend: { position: 'bottom', labels: { padding: 15 } } };
+  let mergedPlugins = opt.plugins ? Object.assign({}, defaultPlugins, opt.plugins) : defaultPlugins;
+  
+  let finalOpt = Object.assign({}, opt);
+  finalOpt.plugins = mergedPlugins;
+
+  Chart.defaults.font.family = "'Noto Sans KR', sans-serif";
+  chartInstances[id] = new Chart(document.getElementById(id), { 
+    type, data: dts, 
+    options: { responsive: true, maintainAspectRatio: false, layout: { padding: { bottom: 15 } }, ...finalOpt } 
+  });
+}
+
 function renderSummaryView() {
   const currYear = parseInt(state.year);
   const currData = rawData.filter(d => d.y === currYear && (state.month === 'All' || String(d.m) === state.month) && (state.hq === 'All' || d.hq === state.hq) && (state.team === 'All' || d.team === state.team));
@@ -118,20 +135,11 @@ function renderSummaryView() {
   applyYoYBadge('sum-kpi-yoy-rev', currStats.revTotal, prevStats.revTotal);
   applyYoYBadge('sum-kpi-yoy-gp', currStats.gp, prevStats.gp);
 
-  Chart.defaults.font.family = "'Noto Sans KR', sans-serif";
-  const render = (id, type, dts, opt) => {
-    if (chartInstances[id]) chartInstances[id].destroy();
-    chartInstances[id] = new Chart(document.getElementById(id), { 
-      type, data: dts, 
-      options: { responsive: true, maintainAspectRatio: false, layout: { padding: { bottom: 15 } }, plugins: { legend: { position: 'bottom', labels: { padding: 15 } } }, ...opt } 
-    });
-  };
-
   const mCurrRev = Array(12).fill(0), mPrevRev = Array(12).fill(0);
   currData.forEach(d => { if (d.type === '매출') mCurrRev[d.m - 1] += d.amt; });
   prevData.forEach(d => { if (d.type === '매출') mPrevRev[d.m - 1] += d.amt; });
 
-  render('sum-chart-trend', 'line', {
+  renderChart('sum-chart-trend', 'line', {
     labels: ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'],
     datasets: [
       { label: `${currYear}년 매출`, data: mCurrRev, borderColor: '#00A6B2', backgroundColor: '#00A6B2', tension: 0.3, borderWidth: 3 },
@@ -140,7 +148,7 @@ function renderSummaryView() {
   });
 
   let gpForChart = currStats.gp < 0 ? 0 : currStats.gp;
-  render('sum-chart-cost', 'doughnut', { 
+  renderChart('sum-chart-cost', 'doughnut', { 
     labels: ['매출이익', '변동원가', '고정원가'], 
     datasets: [{ data: [gpForChart, currStats.varC, currStats.fixC], backgroundColor: ['#00A6B2', '#2E79B5', '#E9ECEF'], borderWidth: 0 }] 
   });
@@ -220,7 +228,7 @@ function renderSingleClientDetail() {
   const annualPrev = rawData.filter(d => d.y === currYear - 1 && d.client === clientName);
   
   const m1Rev = Array(12).fill(0), m1CM = Array(12).fill(0), m1GP = Array(12).fill(0);
-  const m1CMRate = Array(12).fill(0), m1GPRate = Array(12).fill(0); // ★ 이익률 계산용 배열
+  const m2Rev = Array(12).fill(0), m2CM = Array(12).fill(0), m2GP = Array(12).fill(0);
   
   annualCurr.forEach(d => { 
     const i = d.m-1; 
@@ -229,52 +237,75 @@ function renderSingleClientDetail() {
     else if(d.type==='고정원가') m1GP[i]-=d.amt; 
   });
   
-  // 이익률 계산
-  for(let i=0; i<12; i++) {
-    m1CMRate[i] = m1Rev[i] === 0 ? 0 : (m1CM[i] / m1Rev[i]) * 100;
-    m1GPRate[i] = m1Rev[i] === 0 ? 0 : (m1GP[i] / m1Rev[i]) * 100;
-  }
+  annualPrev.forEach(d => { 
+    const i = d.m-1; 
+    if(d.type==='매출'){ m2Rev[i]+=d.amt; m2CM[i]+=d.amt; m2GP[i]+=d.amt; } 
+    else if(d.type==='변동원가'){ m2CM[i]-=d.amt; m2GP[i]-=d.amt; } 
+    else if(d.type==='고정원가') m2GP[i]-=d.amt; 
+  });
   
-  const m2Rev = Array(12).fill(0);
-  annualPrev.forEach(d => { if(d.type==='매출') m2Rev[d.m-1]+=d.amt; });
+  // ★ 차트 왜곡 방지를 위해 데이터 Capping 로직 적용 (-100% ~ 100%)
+  const safeRate = (profit, rev) => rev === 0 ? 0 : (profit / rev) * 100;
+  const cap = (val) => val > 100 ? 100 : (val < -100 ? -100 : val);
 
-  Chart.defaults.font.family = "'Noto Sans KR', sans-serif";
-  const render = (id, type, dts, opt) => {
-    if (chartInstances[id]) chartInstances[id].destroy();
-    chartInstances[id] = new Chart(document.getElementById(id), { 
-      type, data: dts, 
-      options: { responsive: true, maintainAspectRatio: false, layout: { padding: { bottom: 15 } }, plugins: { legend: { position: 'bottom', labels: { padding: 15 } } }, ...opt } 
-    });
-  };
+  // 실제 데이터 보존용 배열
+  const real1CM = Array(12).fill(0), real1GP = Array(12).fill(0);
+  const real2CM = Array(12).fill(0), real2GP = Array(12).fill(0);
+  
+  // 차트 렌더링용 제한된 배열
+  const chart1CM = Array(12).fill(0), chart1GP = Array(12).fill(0);
+  const chart2CM = Array(12).fill(0), chart2GP = Array(12).fill(0);
 
-  // 1. 기존 트렌드 차트 (금액 전용으로 원상복구)
-  render('det-chart-trend', 'line', {
-    labels: ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'],
-    datasets: [
-      { label: '매출', data: m1Rev, borderColor: '#B0BEC5', backgroundColor: 'transparent', tension: 0.3, borderDash: [5,5] },
-      { label: '공헌이익', data: m1CM, borderColor: '#00A6B2', backgroundColor: '#00A6B2', tension: 0.3, borderWidth: 3 },
-      { label: '매출이익', data: m1GP, borderColor: '#F39C12', backgroundColor: '#F39C12', tension: 0.3, borderWidth: 3 }
-    ]
-  });
+  for(let i=0; i<12; i++) {
+    real1CM[i] = safeRate(m1CM[i], m1Rev[i]);
+    real1GP[i] = safeRate(m1GP[i], m1Rev[i]);
+    real2CM[i] = safeRate(m2CM[i], m2Rev[i]);
+    real2GP[i] = safeRate(m2GP[i], m2Rev[i]);
 
-  // 2. ★ 신규 추가된 "이익률(%) 전용 차트"
-  render('det-chart-margin', 'line', {
-    labels: ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'],
-    datasets: [
-      { label: '공헌이익률(%)', data: m1CMRate, borderColor: '#00A6B2', backgroundColor: 'transparent', tension: 0.3, borderWidth: 2, pointBackgroundColor: '#00A6B2' },
-      { label: '매출이익률(%)', data: m1GPRate, borderColor: '#E74C3C', backgroundColor: 'transparent', tension: 0.3, borderWidth: 2, pointBackgroundColor: '#E74C3C' }
-    ]
-  }, {
-    scales: { y: { ticks: { callback: v => v + '%' } } }
-  });
+    chart1CM[i] = cap(real1CM[i]);
+    chart1GP[i] = cap(real1GP[i]);
+    chart2CM[i] = cap(real2CM[i]);
+    chart2GP[i] = cap(real2GP[i]);
+  }
 
-  // 3. 전년 동기 매출 비교 차트
-  render('det-chart-yoy', 'bar', {
+  // 1. 좌측 차트 (매출액)
+  renderChart('det-chart-yoy', 'bar', {
     labels: ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'],
     datasets: [
       { label: `${currYear}년 매출`, data: m1Rev, backgroundColor: '#00A6B2', borderRadius: 4 },
       { label: `${currYear-1}년 매출`, data: m2Rev, backgroundColor: '#DEE2E6', borderRadius: 4 }
     ]
+  });
+
+  // 2. 우측 차트 (이익률 전용 - 마우스 오버 시 적자 표시)
+  renderChart('det-chart-margin', 'line', {
+    labels: ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'],
+    datasets: [
+      { label: `${currYear} 공헌이익률(%)`, data: chart1CM, realData: real1CM, borderColor: '#00A6B2', backgroundColor: 'transparent', tension: 0.3, borderWidth: 3 },
+      { label: `${currYear} 매출이익률(%)`, data: chart1GP, realData: real1GP, borderColor: '#F39C12', backgroundColor: 'transparent', tension: 0.3, borderWidth: 3 },
+      { label: `${currYear-1} 공헌이익률(%)`, data: chart2CM, realData: real2CM, borderColor: '#B0BEC5', backgroundColor: 'transparent', tension: 0.3, borderDash: [5,5], borderWidth: 2 },
+      { label: `${currYear-1} 매출이익률(%)`, data: chart2GP, realData: real2GP, borderColor: '#E8A37E', backgroundColor: 'transparent', tension: 0.3, borderDash: [5,5], borderWidth: 2 }
+    ]
+  }, {
+    scales: { 
+      y: { 
+        min: -100, max: 100, // Y축 강제 고정으로 선이 뚫고 나가지 않음
+        ticks: { callback: v => v + '%' } 
+      } 
+    },
+    plugins: {
+      tooltip: {
+        callbacks: {
+          label: function(context) {
+            let realVal = context.dataset.realData[context.dataIndex]; // 툴팁은 숨겨둔 진짜 데이터를 가져옴
+            let prefix = context.dataset.label + ': ';
+            if (realVal < -100) return prefix + realVal.toFixed(1) + '% (적자)';
+            if (realVal > 100) return prefix + realVal.toFixed(1) + '% (초과)';
+            return prefix + realVal.toFixed(1) + '%';
+          }
+        }
+      }
+    }
   });
 
   const detTbody = document.querySelector('#det-table tbody');
