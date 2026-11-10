@@ -6,7 +6,7 @@
   <title>EUGENE SONIC 경영관리</title>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <link rel="stylesheet" href="style.css?v=9">
+  <link rel="stylesheet" href="style.css?v=11">
 </head>
 <body>
   <div id="loader" class="loader-container"><div class="spinner"></div><p>ERP 데이터 동기화 중...</p></div>
@@ -78,19 +78,15 @@
             <div class="kpi-card highlight-card"><h3>매출이익</h3><p id="det-kpi-gp">-</p><div class="yoy-badge" id="det-kpi-yoy-gp" style="margin-top: 5px;">-</div><div class="sub-kpi">이익률: <b id="det-kpi-gp-rate">-</b></div></div>
           </div>
           
-          <!-- ★ 차트 레이아웃 (총 3개로 분리) -->
-          <div class="chart-layout" id="detail-chart-layout">
+          <div class="chart-layout" style="grid-template-columns: 1fr 1fr;">
             <div class="chart-box large-chart">
-              <div class="box-header"><h4>월별 실적 및 이익 추이</h4></div>
-              <div class="canvas-wrap"><canvas id="det-chart-trend"></canvas></div>
-            </div>
-            <div class="chart-box large-chart">
-              <div class="box-header"><h4>월별 이익률(%) 추이</h4></div>
-              <div class="canvas-wrap"><canvas id="det-chart-margin"></canvas></div>
-            </div>
-            <div class="chart-box large-chart">
-              <div class="box-header"><h4>전년 동기 매출 비교</h4></div>
+              <div class="box-header"><h4>전년 동기 매출액 비교</h4></div>
               <div class="canvas-wrap"><canvas id="det-chart-yoy"></canvas></div>
+            </div>
+            <div class="chart-box large-chart">
+              <!-- 타이틀 변경됨 -->
+              <div class="box-header"><h4>월별 이익률(%) 전년 비교</h4><span class="subtitle">±100% 한계치 적용 (초과/적자 발생 시 마우스 오버로 실제 수치 확인)</span></div>
+              <div class="canvas-wrap"><canvas id="det-chart-margin"></canvas></div>
             </div>
           </div>
 
@@ -119,6 +115,6 @@
     </div>
   </div>
 
-  <script src="script.js?v=9" defer></script>
+  <script src="script.js?v=12" defer></script>
 </body>
 </html>
