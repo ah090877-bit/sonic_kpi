@@ -6,7 +6,7 @@
   <title>EUGENE SONIC 경영관리</title>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <link rel="stylesheet" href="style.css?v=8">
+  <link rel="stylesheet" href="style.css?v=9">
 </head>
 <body>
   <div id="loader" class="loader-container"><div class="spinner"></div><p>ERP 데이터 동기화 중...</p></div>
@@ -37,7 +37,6 @@
 
       <div class="scroll-area">
         
-        <!-- 뷰 1: 본부별 / 팀별 실적 -->
         <div id="view-summary" style="display: none; flex-direction: column; gap: 20px;">
           <div class="kpi-grid">
             <div class="kpi-card"><h3>총 매출액</h3><p id="sum-kpi-rev">-</p><div class="yoy-badge" id="sum-kpi-yoy-rev">-</div></div>
@@ -45,7 +44,6 @@
             <div class="kpi-card highlight-card"><h3>매출이익</h3><p id="sum-kpi-gp">-</p><div class="yoy-badge" id="sum-kpi-yoy-gp" style="margin-top: 5px;">-</div><div class="sub-kpi">이익률: <b id="sum-kpi-gp-rate">-</b></div></div>
           </div>
           <div class="chart-layout">
-            <!-- ★ 캔버스 래퍼 추가 -->
             <div class="chart-box large-chart"><div class="box-header"><h4>전년 대비 당해 연도 매출 추이</h4></div><div class="canvas-wrap"><canvas id="sum-chart-trend"></canvas></div></div>
             <div class="chart-box small-chart"><div class="box-header"><h4>당기 비용 및 이익 구조</h4></div><div class="canvas-wrap"><canvas id="sum-chart-cost"></canvas></div></div>
           </div>
@@ -60,7 +58,6 @@
           </div>
         </div>
 
-        <!-- 뷰 2: 화주사별 카드 뷰 -->
         <div id="view-cards" style="display: none;">
           <div class="box-header" style="margin-bottom: 20px;">
             <h4>화주사별 요약 카드</h4><span class="subtitle">카드를 클릭하면 상세 차트와 전년비 분석을 볼 수 있습니다.</span>
@@ -68,7 +65,6 @@
           <div id="card-container" class="card-grid"></div>
         </div>
 
-        <!-- 뷰 3: 특정 화주사 상세 분석 -->
         <div id="view-detail" style="display: none; flex-direction: column; gap: 20px;">
           <div class="detail-header">
             <button class="btn-back" onclick="goBackToCards()">← 목록으로 돌아가기</button>
@@ -82,11 +78,15 @@
             <div class="kpi-card highlight-card"><h3>매출이익</h3><p id="det-kpi-gp">-</p><div class="yoy-badge" id="det-kpi-yoy-gp" style="margin-top: 5px;">-</div><div class="sub-kpi">이익률: <b id="det-kpi-gp-rate">-</b></div></div>
           </div>
           
-          <div class="chart-layout">
-            <!-- ★ 캔버스 래퍼 추가 -->
+          <!-- ★ 차트 레이아웃 (총 3개로 분리) -->
+          <div class="chart-layout" id="detail-chart-layout">
             <div class="chart-box large-chart">
-              <div class="box-header"><h4>월별 실적 및 이익 구조 추이 (매출이익률 포함)</h4></div>
+              <div class="box-header"><h4>월별 실적 및 이익 추이</h4></div>
               <div class="canvas-wrap"><canvas id="det-chart-trend"></canvas></div>
+            </div>
+            <div class="chart-box large-chart">
+              <div class="box-header"><h4>월별 이익률(%) 추이</h4></div>
+              <div class="canvas-wrap"><canvas id="det-chart-margin"></canvas></div>
             </div>
             <div class="chart-box large-chart">
               <div class="box-header"><h4>전년 동기 매출 비교</h4></div>
@@ -119,6 +119,6 @@
     </div>
   </div>
 
-  <script src="script.js?v=8" defer></script>
+  <script src="script.js?v=9" defer></script>
 </body>
 </html>
