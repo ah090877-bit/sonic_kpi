@@ -6,10 +6,10 @@
   <title>EUGENE SONIC 경영관리</title>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <link rel="stylesheet" href="style.css?v=11">
+  <link rel="stylesheet" href="style.css?v=15">
 </head>
 <body>
-  <div id="loader" class="loader-container"><div class="spinner"></div><p>ERP 데이터 동기화 중...</p></div>
+  <div id="loader" class="loader-container"><div class="spinner"></div><p>데이터 동기화 중...</p></div>
   
   <div class="app-wrapper" style="display: none;" id="app">
     <aside class="sidebar">
@@ -18,7 +18,7 @@
       <ul class="nav-list">
         <li class="nav-item active" data-view="hq">🏢 본부별 실적 요약</li>
         <li class="nav-item" data-view="team">👥 팀별 실적 요약</li>
-        <li class="nav-item" data-view="client">💳 화주사별 카드 뷰</li>
+        <li class="nav-item" data-view="client">💳 화주사별 실적 뷰</li>
       </ul>
     </aside>
 
@@ -30,18 +30,20 @@
 
       <div class="filter-bar">
         <div class="filter-group"><label>연도</label><select id="f-year"></select></div>
-        <div class="filter-group"><label>월</label><select id="f-month"></select></div>
+        <!-- 상세 뷰에서는 월 필터가 자동 숨김 처리됩니다 -->
+        <div class="filter-group" id="filter-month-wrap"><label>월</label><select id="f-month"></select></div>
         <div class="filter-group"><label>본부</label><select id="f-hq"></select></div>
         <div class="filter-group"><label>팀</label><select id="f-team"></select></div>
       </div>
 
       <div class="scroll-area">
         
+        <!-- 1. 본부/팀 요약 뷰 -->
         <div id="view-summary" style="display: none; flex-direction: column; gap: 20px;">
           <div class="kpi-grid">
-            <div class="kpi-card"><h3>총 매출액</h3><p id="sum-kpi-rev">-</p><div class="yoy-badge" id="sum-kpi-yoy-rev">-</div></div>
-            <div class="kpi-card highlight-card"><h3>공헌이익</h3><p id="sum-kpi-cm">-</p><div class="sub-kpi">이익률: <b id="sum-kpi-cm-rate">-</b></div></div>
-            <div class="kpi-card highlight-card"><h3>매출이익</h3><p id="sum-kpi-gp">-</p><div class="yoy-badge" id="sum-kpi-yoy-gp" style="margin-top: 5px;">-</div><div class="sub-kpi">이익률: <b id="sum-kpi-gp-rate">-</b></div></div>
+            <div class="kpi-card" style="border-top-color: #4A90E2;"><h3>총 매출액</h3><p id="sum-kpi-rev">-</p><div class="yoy-badge" id="sum-kpi-yoy-rev">-</div></div>
+            <div class="kpi-card" style="border-top-color: #00A6B2;"><h3>공헌이익</h3><p id="sum-kpi-cm">-</p><div class="sub-kpi">이익률: <b id="sum-kpi-cm-rate">-</b></div></div>
+            <div class="kpi-card" style="border-top-color: #F39C12;"><h3>매출이익</h3><p id="sum-kpi-gp">-</p><div class="yoy-badge" id="sum-kpi-yoy-gp" style="margin-top: 5px;">-</div><div class="sub-kpi">이익률: <b id="sum-kpi-gp-rate">-</b></div></div>
           </div>
           <div class="chart-layout">
             <div class="chart-box large-chart"><div class="box-header"><h4>전년 대비 당해 연도 매출 추이</h4></div><div class="canvas-wrap"><canvas id="sum-chart-trend"></canvas></div></div>
@@ -49,62 +51,60 @@
           </div>
           <div class="table-container">
             <div class="box-header"><h4 id="table-title">세부 실적 리포트</h4></div>
-            <div class="table-scroll">
-              <table class="data-table" id="sum-table">
-                <thead id="sum-table-head"></thead>
-                <tbody></tbody>
-              </table>
-            </div>
+            <div class="table-scroll"><table class="data-table" id="sum-table"><thead id="sum-table-head"></thead><tbody></tbody></table></div>
           </div>
         </div>
 
+        <!-- 2. 화주사별 카드 뷰 (기존/신규 분리) -->
         <div id="view-cards" style="display: none;">
           <div class="box-header" style="margin-bottom: 20px;">
-            <h4>화주사별 요약 카드</h4><span class="subtitle">카드를 클릭하면 상세 차트와 전년비 분석을 볼 수 있습니다.</span>
+            <h4>화주사별 요약 카드</h4><span class="subtitle">해당 연/월의 실적입니다. 카드를 클릭하면 연간 상세 분석을 볼 수 있습니다.</span>
           </div>
-          <div id="card-container" class="card-grid"></div>
+          
+          <div class="section-divider"><span>🟢 기존 사업 화주사</span></div>
+          <div id="card-container-exist" class="card-grid" style="margin-bottom: 50px;"></div>
+          
+          <div class="section-divider"><span>🔴 신규 사업 화주사</span></div>
+          <div id="card-container-new" class="card-grid"></div>
         </div>
 
+        <!-- 3. 화주사 상세 분석 뷰 (연간 데이터) -->
         <div id="view-detail" style="display: none; flex-direction: column; gap: 20px;">
           <div class="detail-header">
             <button class="btn-back" onclick="goBackToCards()">← 목록으로 돌아가기</button>
             <h2 id="detail-title">화주사명</h2>
-            <span id="detail-subtitle">본부 / 팀</span>
+            <span id="detail-subtitle">본부 / 팀 (연간 누계 실적)</span>
           </div>
           
+          <!-- 연간 통합 KPI -->
           <div class="kpi-grid">
-            <div class="kpi-card"><h3>총 매출</h3><p id="det-kpi-rev">-</p><div class="yoy-badge" id="det-kpi-yoy-rev">-</div></div>
-            <div class="kpi-card highlight-card"><h3>공헌이익</h3><p id="det-kpi-cm">-</p><div class="sub-kpi">이익률: <b id="det-kpi-cm-rate">-</b></div></div>
-            <div class="kpi-card highlight-card"><h3>매출이익</h3><p id="det-kpi-gp">-</p><div class="yoy-badge" id="det-kpi-yoy-gp" style="margin-top: 5px;">-</div><div class="sub-kpi">이익률: <b id="det-kpi-gp-rate">-</b></div></div>
+            <div class="kpi-card" style="border-top-color: #4A90E2;"><h3>연간 총 매출</h3><p id="det-kpi-rev">-</p><div class="yoy-badge" id="det-kpi-yoy-rev">-</div></div>
+            <div class="kpi-card" style="border-top-color: #00A6B2;"><h3>연간 공헌이익</h3><p id="det-kpi-cm">-</p><div class="sub-kpi">이익률: <b id="det-kpi-cm-rate">-</b></div></div>
+            <div class="kpi-card" style="border-top-color: #F39C12;"><h3>연간 매출이익</h3><p id="det-kpi-gp">-</p><div class="yoy-badge" id="det-kpi-yoy-gp" style="margin-top: 5px;">-</div><div class="sub-kpi">이익률: <b id="det-kpi-gp-rate">-</b></div></div>
           </div>
           
+          <!-- 차트 -->
           <div class="chart-layout" style="grid-template-columns: 1fr 1fr;">
-            <div class="chart-box large-chart">
-              <div class="box-header"><h4>전년 동기 매출액 비교</h4></div>
-              <div class="canvas-wrap"><canvas id="det-chart-yoy"></canvas></div>
-            </div>
-            <div class="chart-box large-chart">
-              <div class="box-header"><h4>월별 이익률(%) 전년 비교</h4><span class="subtitle">±100% 한계치 적용 (초과/적자 발생 시 마우스 오버로 실제 수치 확인)</span></div>
-              <div class="canvas-wrap"><canvas id="det-chart-margin"></canvas></div>
-            </div>
+            <div class="chart-box large-chart"><div class="box-header"><h4>전년 동기 매출액 비교</h4></div><div class="canvas-wrap"><canvas id="det-chart-yoy"></canvas></div></div>
+            <div class="chart-box large-chart"><div class="box-header"><h4>월별 이익률(%) 전년 비교</h4><span class="subtitle">초과/적자 발생 시 마우스 오버로 실제 수치 확인</span></div><div class="canvas-wrap"><canvas id="det-chart-margin"></canvas></div></div>
           </div>
 
-          <!-- ★ 표 항목 명확히 분리 -->
-          <div class="table-container">
-            <div class="box-header">
-              <h4>월별 상세 실적 리포트</h4>
-              <span class="subtitle">해당 화주사의 1월 ~ 12월 누적 데이터</span>
-            </div>
+          <!-- 테이블 분리 (기존/신규) -->
+          <div class="table-container" id="detail-table-exist-wrap">
+            <div class="box-header"><h4>🟢 [기존] 월별 상세 실적 리포트</h4><span class="subtitle">해당 연도의 1월 ~ 12월 데이터</span></div>
             <div class="table-scroll">
-              <table class="data-table" id="det-table">
-                <thead>
-                  <tr>
-                    <th>해당 월</th>
-                    <th>당기 매출</th><th>전년 동기 매출</th><th>증감률</th>
-                    <th>운송수입</th><th>지입료수입</th><th>변동원가</th>
-                    <th>공헌이익</th><th>공헌이익률</th><th>고정원가</th><th>매출이익</th><th>매출이익률</th>
-                  </tr>
-                </thead>
+              <table class="data-table" id="det-table-exist">
+                <thead><tr><th>해당 월</th><th>당기 매출</th><th>전년 동기 매출</th><th>증감률</th><th>운송수입</th><th>지입료수입</th><th>변동원가</th><th>공헌이익</th><th>공헌이익률</th><th>고정원가</th><th>매출이익</th><th>매출이익률</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+          
+          <div class="table-container" id="detail-table-new-wrap">
+            <div class="box-header"><h4>🔴 [신규] 월별 상세 실적 리포트</h4><span class="subtitle">해당 연도의 1월 ~ 12월 데이터</span></div>
+            <div class="table-scroll">
+              <table class="data-table" id="det-table-new">
+                <thead><tr><th>해당 월</th><th>당기 매출</th><th>전년 동기 매출</th><th>증감률</th><th>운송수입</th><th>지입료수입</th><th>변동원가</th><th>공헌이익</th><th>공헌이익률</th><th>고정원가</th><th>매출이익</th><th>매출이익률</th></tr></thead>
                 <tbody></tbody>
               </table>
             </div>
@@ -115,6 +115,6 @@
     </div>
   </div>
 
-  <script src="script.js?v=13" defer></script>
+  <script src="script.js?v=15" defer></script>
 </body>
 </html>
