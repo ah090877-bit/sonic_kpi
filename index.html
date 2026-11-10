@@ -3,18 +3,28 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>유진소닉 화주사별 대시보드</title>
+  <title>EUGENE SONIC 대시보드</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <link rel="stylesheet" href="style.css?v=3">
+  <link rel="stylesheet" href="style.css?v=4">
 </head>
 <body>
-  <div id="loader" class="loader-container"><div class="spinner"></div><p>ERP 동기화 중...</p></div>
+  <div id="loader" class="loader-container"><div class="spinner"></div><p>데이터 동기화 중...</p></div>
   
   <div class="app-wrapper" style="display: none;" id="app">
+    <!-- 왼쪽 화주사 리스트 사이드바 -->
+    <aside class="sidebar">
+      <div class="sidebar-logo"><h2>EUGENE</h2></div>
+      <div class="sidebar-menu-title">화주사 리스트</div>
+      <ul class="client-list" id="client-list">
+        <!-- 자바스크립트에서 화주사 목록 자동 생성 -->
+      </ul>
+    </aside>
+
+    <!-- 우측 메인 영역 -->
     <div class="main-content">
       <header class="top-header">
-        <div class="page-title">경영관리 화주사별 대시보드</div>
-        <button class="btn-refresh" onclick="fetchData()">데이터 새로고침</button>
+        <div class="page-title">화주사별 경영관리 대시보드</div>
+        <button class="btn-refresh" onclick="fetchData()">Data Sync</button>
       </header>
 
       <!-- 상단 기간 및 조직 필터 -->
@@ -25,43 +35,41 @@
         <div class="filter-group"><label>팀</label><select id="f-team"></select></div>
       </div>
 
-      <!-- 화주사 카드가 배열될 영역 -->
-      <div class="scroll-area">
+      <!-- 뷰 1: 전체 화주사 카드 뷰 (기본 화면) -->
+      <div id="view-multi" class="scroll-area">
         <div id="card-container" class="card-grid">
-          <!-- 스크립트에서 카드가 자동 생성됩니다 -->
+          <!-- 카드 자동 생성 -->
         </div>
       </div>
+
+      <!-- 뷰 2: 특정 화주사 상세 분석 뷰 (클릭 시 나타남) -->
+      <div id="view-single" class="scroll-area" style="display: none;">
+        <div class="detail-header">
+          <h2 id="detail-title">화주사명</h2>
+          <span id="detail-subtitle">본부 / 팀</span>
+        </div>
+        
+        <div class="kpi-grid">
+          <div class="kpi-card"><h3>총 매출</h3><p id="s-kpi-rev">-</p><div class="yoy-badge" id="s-kpi-yoy-rev">-</div></div>
+          <div class="kpi-card highlight-card"><h3>공헌이익</h3><p id="s-kpi-cm">-</p><div class="sub-kpi">이익률: <b id="s-kpi-cm-ratio">-</b></div></div>
+          <div class="kpi-card highlight-card"><h3>매출이익</h3><p id="s-kpi-gp">-</p><div class="yoy-badge" id="s-kpi-yoy-gp" style="margin-top: 5px;">-</div><div class="sub-kpi">이익률: <b id="s-kpi-gp-ratio">-</b></div></div>
+        </div>
+        
+        <div class="chart-layout" style="margin-top: 20px;">
+          <div class="chart-box large-chart">
+            <div class="box-header"><h4>월별 실적 및 이익 구조 추이</h4></div>
+            <canvas id="chart-single-trend"></canvas>
+          </div>
+          <div class="chart-box large-chart">
+            <div class="box-header"><h4>전년 동기 매출 비교</h4></div>
+            <canvas id="chart-single-yoy"></canvas>
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
 
-  <!-- 화주사 카드 클릭 시 뜨는 상세 팝업(Modal) -->
-  <div id="detail-modal" class="modal">
-    <div class="modal-content">
-      <span class="close-btn" onclick="closeModal()">&times;</span>
-      <div class="modal-header">
-        <h2 id="modal-title">화주사 상세 리포트</h2>
-        <span id="modal-subtitle" class="modal-subtitle"></span>
-      </div>
-      
-      <div class="kpi-grid" style="margin-top: 20px;">
-        <div class="kpi-card"><h3>총 매출</h3><p id="m-kpi-rev">-</p><div class="yoy-badge" id="m-kpi-yoy-rev">-</div></div>
-        <div class="kpi-card highlight-card"><h3>공헌이익</h3><p id="m-kpi-cm">-</p><div class="sub-kpi">이익률: <b id="m-kpi-cm-ratio">-</b></div></div>
-        <div class="kpi-card highlight-card"><h3>매출이익</h3><p id="m-kpi-gp">-</p><div class="yoy-badge" id="m-kpi-yoy-gp" style="margin-top: 5px;">-</div><div class="sub-kpi">이익률: <b id="m-kpi-gp-ratio">-</b></div></div>
-      </div>
-      
-      <div class="chart-layout" style="margin-top: 20px;">
-        <div class="chart-box large-chart">
-          <div class="box-header"><h4>월별 이익 구조 추이</h4></div>
-          <canvas id="modal-chart-trend"></canvas>
-        </div>
-        <div class="chart-box large-chart">
-          <div class="box-header"><h4>전년 동기 매출 비교</h4></div>
-          <canvas id="modal-chart-yoy"></canvas>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <script src="script.js?v=3" defer></script>
+  <script src="script.js?v=4" defer></script>
 </body>
 </html>
