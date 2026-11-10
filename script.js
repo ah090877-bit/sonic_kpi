@@ -1,4 +1,4 @@
-const API_URL = '여기에_방금_새배포로_받은_URL을_넣으세요';
+const API_URL = 'https://script.google.com/macros/s/AKfycbxoRToFFWcjmzjxxYkvPHourAy9C3FxTBWzoASIgiKBWkyofecavJCVyCo8hRy306gq/exec';
 
 let rawData = [];
 let chartInstances = {};
