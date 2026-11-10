@@ -118,20 +118,12 @@ function renderSummaryView() {
   applyYoYBadge('sum-kpi-yoy-rev', currStats.revTotal, prevStats.revTotal);
   applyYoYBadge('sum-kpi-yoy-gp', currStats.gp, prevStats.gp);
 
-  // 차트 렌더링 세팅 (범례 패딩 추가로 잘림 방지 완벽 대응)
   Chart.defaults.font.family = "'Noto Sans KR', sans-serif";
   const render = (id, type, dts, opt) => {
     if (chartInstances[id]) chartInstances[id].destroy();
     chartInstances[id] = new Chart(document.getElementById(id), { 
-      type, 
-      data: dts, 
-      options: { 
-        responsive: true, 
-        maintainAspectRatio: false, 
-        layout: { padding: { bottom: 15 } }, // 하단 여백 추가
-        plugins: { legend: { position: 'bottom', labels: { padding: 15 } } }, // 범례 여백 추가
-        ...opt 
-      } 
+      type, data: dts, 
+      options: { responsive: true, maintainAspectRatio: false, layout: { padding: { bottom: 15 } }, plugins: { legend: { position: 'bottom', labels: { padding: 15 } } }, ...opt } 
     });
   };
 
@@ -227,7 +219,9 @@ function renderSingleClientDetail() {
   const annualCurr = rawData.filter(d => d.y === currYear && d.client === clientName);
   const annualPrev = rawData.filter(d => d.y === currYear - 1 && d.client === clientName);
   
-  const m1Rev = Array(12).fill(0), m1CM = Array(12).fill(0), m1GP = Array(12).fill(0), m1GPRate = Array(12).fill(0);
+  const m1Rev = Array(12).fill(0), m1CM = Array(12).fill(0), m1GP = Array(12).fill(0);
+  const m1CMRate = Array(12).fill(0), m1GPRate = Array(12).fill(0); // ★ 이익률 계산용 배열
+  
   annualCurr.forEach(d => { 
     const i = d.m-1; 
     if(d.type==='매출'){ m1Rev[i]+=d.amt; m1CM[i]+=d.amt; m1GP[i]+=d.amt; } 
@@ -235,8 +229,9 @@ function renderSingleClientDetail() {
     else if(d.type==='고정원가') m1GP[i]-=d.amt; 
   });
   
-  // ★ 요청하신 매출이익률 배열 계산
+  // 이익률 계산
   for(let i=0; i<12; i++) {
+    m1CMRate[i] = m1Rev[i] === 0 ? 0 : (m1CM[i] / m1Rev[i]) * 100;
     m1GPRate[i] = m1Rev[i] === 0 ? 0 : (m1GP[i] / m1Rev[i]) * 100;
   }
   
@@ -248,32 +243,32 @@ function renderSingleClientDetail() {
     if (chartInstances[id]) chartInstances[id].destroy();
     chartInstances[id] = new Chart(document.getElementById(id), { 
       type, data: dts, 
-      options: { 
-        responsive: true, 
-        maintainAspectRatio: false, 
-        layout: { padding: { bottom: 15 } },
-        plugins: { legend: { position: 'bottom', labels: { padding: 15 } } }, 
-        ...opt 
-      } 
+      options: { responsive: true, maintainAspectRatio: false, layout: { padding: { bottom: 15 } }, plugins: { legend: { position: 'bottom', labels: { padding: 15 } } }, ...opt } 
     });
   };
 
-  // ★ 이중 Y축(매출이익률 표시) 차트 렌더링
+  // 1. 기존 트렌드 차트 (금액 전용으로 원상복구)
   render('det-chart-trend', 'line', {
     labels: ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'],
     datasets: [
-      { label: '매출', data: m1Rev, borderColor: '#B0BEC5', backgroundColor: 'transparent', tension: 0.3, borderDash: [5,5], yAxisID: 'y' },
-      { label: '공헌이익', data: m1CM, borderColor: '#00A6B2', backgroundColor: '#00A6B2', tension: 0.3, borderWidth: 3, yAxisID: 'y' },
-      { label: '매출이익', data: m1GP, borderColor: '#F39C12', backgroundColor: '#F39C12', tension: 0.3, borderWidth: 3, yAxisID: 'y' },
-      { label: '매출이익률(%)', data: m1GPRate, borderColor: '#E74C3C', backgroundColor: '#E74C3C', tension: 0.3, borderWidth: 2, pointRadius: 4, yAxisID: 'y1' } // 이익률 라인 추가
+      { label: '매출', data: m1Rev, borderColor: '#B0BEC5', backgroundColor: 'transparent', tension: 0.3, borderDash: [5,5] },
+      { label: '공헌이익', data: m1CM, borderColor: '#00A6B2', backgroundColor: '#00A6B2', tension: 0.3, borderWidth: 3 },
+      { label: '매출이익', data: m1GP, borderColor: '#F39C12', backgroundColor: '#F39C12', tension: 0.3, borderWidth: 3 }
     ]
-  }, {
-    scales: {
-      y: { type: 'linear', display: true, position: 'left' },
-      y1: { type: 'linear', display: true, position: 'right', grid: { drawOnChartArea: false }, ticks: { callback: v => v + '%' } } // 우측 % 축
-    }
   });
 
+  // 2. ★ 신규 추가된 "이익률(%) 전용 차트"
+  render('det-chart-margin', 'line', {
+    labels: ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'],
+    datasets: [
+      { label: '공헌이익률(%)', data: m1CMRate, borderColor: '#00A6B2', backgroundColor: 'transparent', tension: 0.3, borderWidth: 2, pointBackgroundColor: '#00A6B2' },
+      { label: '매출이익률(%)', data: m1GPRate, borderColor: '#E74C3C', backgroundColor: 'transparent', tension: 0.3, borderWidth: 2, pointBackgroundColor: '#E74C3C' }
+    ]
+  }, {
+    scales: { y: { ticks: { callback: v => v + '%' } } }
+  });
+
+  // 3. 전년 동기 매출 비교 차트
   render('det-chart-yoy', 'bar', {
     labels: ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'],
     datasets: [
