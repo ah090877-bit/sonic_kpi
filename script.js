@@ -15,7 +15,28 @@ function fetchData() {
 function initApp(response) {
   if (!response.success) { alert("오류: " + response.error); return; }
   
-  rawData = response.data.filter(d => d.client !== '화주공통비');
+  let fetchedData = response.data.filter(d => d.client !== '화주공통비');
+  
+  // ★ 요청사항: 조직 이동(리테일1->2팀) 대비, 화주사의 소속을 무조건 "가장 최근 달" 기준으로 통일!
+  const latestOrgMap = {};
+  fetchedData.sort((a, b) => {
+    if (a.y !== b.y) return a.y - b.y;
+    return a.m - b.m;
+  }).forEach(d => {
+    // 날짜순으로 덮어쓰므로 결국 가장 마지막(최신) 소속이 남게 됨
+    latestOrgMap[d.client] = { hq: d.hq, team: d.team };
+  });
+
+  // 모든 과거 데이터의 소속을 최신 소속으로 업데이트
+  fetchedData.forEach(d => {
+    if (latestOrgMap[d.client]) {
+      d.hq = latestOrgMap[d.client].hq;
+      d.team = latestOrgMap[d.client].team;
+    }
+  });
+  
+  rawData = fetchedData; // 통일된 데이터를 원본으로 사용
+
   const years = [...new Set(rawData.map(d => d.y))].sort((a,b)=>b-a);
   if(years.length > 0) state.year = years[0].toString();
   
@@ -101,23 +122,6 @@ function updateDashboard() {
   }
 }
 
-// 🌟 차트 렌더링 통합 관리 (옵션 병합 처리)
-function renderChart(id, type, dts, opt = {}) {
-  if (chartInstances[id]) chartInstances[id].destroy();
-  
-  let defaultPlugins = { legend: { position: 'bottom', labels: { padding: 15 } } };
-  let mergedPlugins = opt.plugins ? Object.assign({}, defaultPlugins, opt.plugins) : defaultPlugins;
-  
-  let finalOpt = Object.assign({}, opt);
-  finalOpt.plugins = mergedPlugins;
-
-  Chart.defaults.font.family = "'Noto Sans KR', sans-serif";
-  chartInstances[id] = new Chart(document.getElementById(id), { 
-    type, data: dts, 
-    options: { responsive: true, maintainAspectRatio: false, layout: { padding: { bottom: 15 } }, ...finalOpt } 
-  });
-}
-
 function renderSummaryView() {
   const currYear = parseInt(state.year);
   const currData = rawData.filter(d => d.y === currYear && (state.month === 'All' || String(d.m) === state.month) && (state.hq === 'All' || d.hq === state.hq) && (state.team === 'All' || d.team === state.team));
@@ -135,11 +139,20 @@ function renderSummaryView() {
   applyYoYBadge('sum-kpi-yoy-rev', currStats.revTotal, prevStats.revTotal);
   applyYoYBadge('sum-kpi-yoy-gp', currStats.gp, prevStats.gp);
 
+  Chart.defaults.font.family = "'Noto Sans KR', sans-serif";
+  const render = (id, type, dts, opt) => {
+    if (chartInstances[id]) chartInstances[id].destroy();
+    chartInstances[id] = new Chart(document.getElementById(id), { 
+      type, data: dts, 
+      options: { responsive: true, maintainAspectRatio: false, layout: { padding: { bottom: 15 } }, plugins: { legend: { position: 'bottom', labels: { padding: 15 } } }, ...opt } 
+    });
+  };
+
   const mCurrRev = Array(12).fill(0), mPrevRev = Array(12).fill(0);
   currData.forEach(d => { if (d.type === '매출') mCurrRev[d.m - 1] += d.amt; });
   prevData.forEach(d => { if (d.type === '매출') mPrevRev[d.m - 1] += d.amt; });
 
-  renderChart('sum-chart-trend', 'line', {
+  render('sum-chart-trend', 'line', {
     labels: ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'],
     datasets: [
       { label: `${currYear}년 매출`, data: mCurrRev, borderColor: '#00A6B2', backgroundColor: '#00A6B2', tension: 0.3, borderWidth: 3 },
@@ -148,7 +161,7 @@ function renderSummaryView() {
   });
 
   let gpForChart = currStats.gp < 0 ? 0 : currStats.gp;
-  renderChart('sum-chart-cost', 'doughnut', { 
+  render('sum-chart-cost', 'doughnut', { 
     labels: ['매출이익', '변동원가', '고정원가'], 
     datasets: [{ data: [gpForChart, currStats.varC, currStats.fixC], backgroundColor: ['#00A6B2', '#2E79B5', '#E9ECEF'], borderWidth: 0 }] 
   });
@@ -244,15 +257,11 @@ function renderSingleClientDetail() {
     else if(d.type==='고정원가') m2GP[i]-=d.amt; 
   });
   
-  // ★ 차트 왜곡 방지를 위해 데이터 Capping 로직 적용 (-100% ~ 100%)
   const safeRate = (profit, rev) => rev === 0 ? 0 : (profit / rev) * 100;
   const cap = (val) => val > 100 ? 100 : (val < -100 ? -100 : val);
 
-  // 실제 데이터 보존용 배열
   const real1CM = Array(12).fill(0), real1GP = Array(12).fill(0);
   const real2CM = Array(12).fill(0), real2GP = Array(12).fill(0);
-  
-  // 차트 렌더링용 제한된 배열
   const chart1CM = Array(12).fill(0), chart1GP = Array(12).fill(0);
   const chart2CM = Array(12).fill(0), chart2GP = Array(12).fill(0);
 
@@ -268,8 +277,16 @@ function renderSingleClientDetail() {
     chart2GP[i] = cap(real2GP[i]);
   }
 
-  // 1. 좌측 차트 (매출액)
-  renderChart('det-chart-yoy', 'bar', {
+  Chart.defaults.font.family = "'Noto Sans KR', sans-serif";
+  const render = (id, type, dts, opt) => {
+    if (chartInstances[id]) chartInstances[id].destroy();
+    chartInstances[id] = new Chart(document.getElementById(id), { 
+      type, data: dts, 
+      options: { responsive: true, maintainAspectRatio: false, spanGaps: true, layout: { padding: { bottom: 15 } }, plugins: { legend: { position: 'bottom', labels: { padding: 15 } } }, ...opt } 
+    });
+  };
+
+  render('det-chart-yoy', 'bar', {
     labels: ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'],
     datasets: [
       { label: `${currYear}년 매출`, data: m1Rev, backgroundColor: '#00A6B2', borderRadius: 4 },
@@ -277,8 +294,7 @@ function renderSingleClientDetail() {
     ]
   });
 
-  // 2. 우측 차트 (이익률 전용 - 마우스 오버 시 적자 표시)
-  renderChart('det-chart-margin', 'line', {
+  render('det-chart-margin', 'line', {
     labels: ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'],
     datasets: [
       { label: `${currYear} 공헌이익률(%)`, data: chart1CM, realData: real1CM, borderColor: '#00A6B2', backgroundColor: 'transparent', tension: 0.3, borderWidth: 3 },
@@ -287,17 +303,12 @@ function renderSingleClientDetail() {
       { label: `${currYear-1} 매출이익률(%)`, data: chart2GP, realData: real2GP, borderColor: '#E8A37E', backgroundColor: 'transparent', tension: 0.3, borderDash: [5,5], borderWidth: 2 }
     ]
   }, {
-    scales: { 
-      y: { 
-        min: -100, max: 100, // Y축 강제 고정으로 선이 뚫고 나가지 않음
-        ticks: { callback: v => v + '%' } 
-      } 
-    },
+    scales: { y: { min: -100, max: 100, ticks: { callback: v => v + '%' } } },
     plugins: {
       tooltip: {
         callbacks: {
           label: function(context) {
-            let realVal = context.dataset.realData[context.dataIndex]; // 툴팁은 숨겨둔 진짜 데이터를 가져옴
+            let realVal = context.dataset.realData[context.dataIndex];
             let prefix = context.dataset.label + ': ';
             if (realVal < -100) return prefix + realVal.toFixed(1) + '% (적자)';
             if (realVal > 100) return prefix + realVal.toFixed(1) + '% (초과)';
@@ -315,138 +326,4 @@ function renderSingleClientDetail() {
     const cData = annualCurr.filter(d => d.m === m);
     const pData = annualPrev.filter(d => d.m === m);
     
-    let cRev = 0, cTrans = 0, cLease = 0, cVar = 0, cFix = 0;
-    cData.forEach(d => {
-      if (d.type === '매출') { cRev += d.amt; if (d.subject === '지입료수입') cLease += d.amt; else cTrans += d.amt; }
-      else if (d.type === '변동원가') cVar += d.amt;
-      else if (d.type === '고정원가') cFix += d.amt;
-    });
-    
-    let pRev = 0;
-    pData.forEach(d => { if (d.type === '매출') pRev += d.amt; });
-    
-    if (cRev === 0 && pRev === 0 && cVar === 0 && cFix === 0) continue;
-    
-    let yoyTxt = '-'; let yoyColor = 'inherit';
-    if (pRev > 0) {
-      const ratio = ((cRev - pRev) / pRev) * 100;
-      yoyTxt = ratio > 0 ? `▲ ${ratio.toFixed(1)}%` : (ratio < 0 ? `▼ ${Math.abs(ratio).toFixed(1)}%` : '-');
-      yoyColor = ratio > 0 ? '#2E7D32' : (ratio < 0 ? '#C62828' : 'inherit');
-    }
-    
-    const cm = cRev - cVar;
-    const cmRatio = cRev === 0 ? 0 : (cm / cRev) * 100;
-    const gp = cm - cFix;
-    
-    let trHtml = `
-      <td class="text-center">${m}월</td>
-      <td style="font-weight:900;">${formatMoney(cRev)}</td>
-      <td style="color:#6C757D;">${formatMoney(pRev)}</td>
-      <td style="color:${yoyColor}; font-weight:900;">${yoyTxt}</td>
-      <td>${formatMoney(cTrans)}</td>
-      <td>${formatMoney(cLease)}</td>
-      <td>${formatMoney(cVar)}</td>
-      <td style="color:#00A6B2; font-weight:900;">${formatMoney(cm)}</td>
-      <td style="font-size:12px; color:#6C757D;">${cmRatio.toFixed(1)}%</td>
-      <td>${formatMoney(cFix)}</td>
-      <td style="color:${gp < 0 ? '#DC3545' : '#212529'}; font-weight:900;">${formatMoney(gp)}</td>
-    `;
-    const tr = document.createElement('tr'); 
-    tr.innerHTML = trHtml; 
-    detTbody.appendChild(tr);
-  }
-}
-
-function goBackToCards() {
-  state.clientView = 'All';
-  updateDashboard();
-}
-
-function calculateStats(data) {
-  let res = { revTotal: 0, revTrans: 0, revLease: 0, varC: 0, fixC: 0, cm: 0, gp: 0 };
-  data.forEach(d => {
-    if (d.type === '매출') { res.revTotal += d.amt; if (d.subject === '지입료수입') res.revLease += d.amt; else res.revTrans += d.amt; } 
-    else if (d.type === '변동원가') res.varC += d.amt;
-    else if (d.type === '고정원가') res.fixC += d.amt;
-  });
-  res.cm = res.revTotal - res.varC; res.gp = res.cm - res.fixC;
-  return res;
-}
-
-function applyYoYBadge(elementId, currVal, prevVal) {
-  const el = document.getElementById(elementId);
-  if (prevVal === 0) { el.innerText = '전년비 -'; el.className = 'yoy-badge yoy-none'; return; }
-  const ratio = ((currVal - prevVal) / prevVal) * 100;
-  if (ratio > 0) { el.innerText = `▲ ${ratio.toFixed(1)}%`; el.className = 'yoy-badge yoy-up'; } 
-  else if (ratio < 0) { el.innerText = `▼ ${Math.abs(ratio).toFixed(1)}%`; el.className = 'yoy-badge yoy-down'; } 
-  else { el.innerText = '-'; el.className = 'yoy-badge yoy-none'; }
-}
-
-function drawTable(currData, prevData) {
-  const head = document.getElementById('sum-table-head');
-  const tbody = document.querySelector('#sum-table tbody');
-  
-  let headHtml = '<tr>';
-  if (state.view === 'hq') headHtml += '<th>조직(본부)</th>';
-  else headHtml += '<th>본부</th><th>팀</th>';
-  
-  headHtml += `
-    <th>당기 매출</th><th>전년 동기 매출</th><th>증감률</th>
-    <th>운송수입</th><th>지입료수입</th><th>변동원가</th>
-    <th>공헌이익</th><th>(이익률)</th><th>고정원가</th><th>매출이익</th>
-  </tr>`;
-  head.innerHTML = headHtml;
-  tbody.innerHTML = '';
-
-  const summary = {};
-  const groupData = (data, isPrev) => {
-    data.forEach(d => {
-      let key = d.hq;
-      if (state.view === 'team') key += `|${d.team}`;
-      if (!summary[key]) summary[key] = { hq: d.hq, team: d.team, currRev: 0, prevRev: 0, trans: 0, lease: 0, varC: 0, fixC: 0 };
-      if (isPrev) { if (d.type === '매출') summary[key].prevRev += d.amt; } 
-      else {
-        if (d.type === '매출') { summary[key].currRev += d.amt; if(d.subject === '지입료수입') summary[key].lease += d.amt; else summary[key].trans += d.amt; }
-        else if (d.type === '변동원가') summary[key].varC += d.amt;
-        else if (d.type === '고정원가') summary[key].fixC += d.amt;
-      }
-    });
-  };
-
-  groupData(prevData, true);
-  groupData(currData, false);
-
-  Object.values(summary).forEach(row => {
-    if (row.currRev === 0 && row.prevRev === 0 && row.varC === 0 && row.fixC === 0) return; 
-    
-    let yoyTxt = '-'; let yoyColor = 'inherit';
-    if (row.prevRev > 0) {
-      const ratio = ((row.currRev - row.prevRev) / row.prevRev) * 100;
-      yoyTxt = ratio > 0 ? `▲ ${ratio.toFixed(1)}%` : (ratio < 0 ? `▼ ${Math.abs(ratio).toFixed(1)}%` : '-');
-      yoyColor = ratio > 0 ? '#2E7D32' : (ratio < 0 ? '#C62828' : 'inherit');
-    }
-
-    const cm = row.currRev - row.varC;
-    const cmRatio = row.currRev === 0 ? 0 : (cm / row.currRev) * 100;
-    const gp = cm - row.fixC;
-    
-    let trHtml = `<td class="text-center">${row.hq}</td>`;
-    if (state.view === 'team') trHtml += `<td class="text-center">${row.team}</td>`;
-
-    trHtml += `
-      <td style="font-weight:900;">${formatMoney(row.currRev)}</td>
-      <td style="color:#6C757D;">${formatMoney(row.prevRev)}</td>
-      <td style="color:${yoyColor}; font-weight:900;">${yoyTxt}</td>
-      <td>${formatMoney(row.trans)}</td>
-      <td>${formatMoney(row.lease)}</td>
-      <td>${formatMoney(row.varC)}</td>
-      <td style="color:#00A6B2; font-weight:900;">${formatMoney(cm)}</td>
-      <td style="font-size:12px; color:#6C757D;">${cmRatio.toFixed(1)}%</td>
-      <td>${formatMoney(row.fixC)}</td>
-      <td style="color:${gp < 0 ? '#DC3545' : '#212529'}; font-weight:900;">${formatMoney(gp)}</td>
-    `;
-    const tr = document.createElement('tr'); tr.innerHTML = trHtml; tbody.appendChild(tr);
-  });
-}
-
-window.onload = fetchData;
+    let cRev = 0, c
