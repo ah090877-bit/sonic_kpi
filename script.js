@@ -1,4 +1,5 @@
-// ★ 복사해 둔 구글 앱스 스크립트 배포 URL을 입력하세요.
+// [script.js]
+// 알려주신 웹 앱 URL 세팅 완료
 const API_URL = 'https://script.google.com/macros/s/AKfycbxoRToFFWcjmzjxxYkvPHourAy9C3FxTBWzoASIgiKBWkyofecavJCVyCo8hRy306gq/exec';
 
 let rawData = [];
@@ -6,6 +7,12 @@ let chartInstances = {};
 const state = { year: 'All', month: 'All', hq: 'All', team: 'All', isNew: 'All', client: 'All' };
 const formatMoney = (val) => (val / 1000000).toLocaleString('ko-KR', { maximumFractionDigits: 0 });
 const isRevenue = (type) => type === '매출';
+
+// 디자인 컬러 변수
+const colorCyan = '#00C4CC';
+const colorBlue = '#4A90E2';
+const colorBg = '#F0F4F8';
+const colorGrey = '#EAECEF';
 
 function fetchData() {
   document.getElementById('loader').style.display = 'flex';
@@ -53,7 +60,7 @@ function populateSelect(id, options, selected, addAll) {
   if (currentVal !== 'All' && !options.includes(currentVal) && !options.includes(Number(currentVal))) {
     currentVal = 'All'; state[key] = 'All'; 
   }
-  el.innerHTML = addAll ? '<option value="All">전체</option>' : '';
+  el.innerHTML = addAll ? '<option value="All">ALL</option>' : '';
   options.forEach(opt => {
     const option = document.createElement('option');
     option.value = opt; option.text = (id === 'f-month') ? opt + '월' : opt;
@@ -104,41 +111,64 @@ function updateKPIs(data) {
     });
   }
   const yoy = prevRev === 0 ? '-' : (((currRev - prevRev) / prevRev) * 100).toFixed(1) + '%';
+  
   document.getElementById('kpi-rev').innerText = formatMoney(rev);
   document.getElementById('kpi-exist').innerText = formatMoney(existRev);
   document.getElementById('kpi-new').innerText = formatMoney(newRev);
-  document.getElementById('kpi-cost').innerText = formatMoney(cost);
   document.getElementById('kpi-profit').innerText = formatMoney(profit);
   document.getElementById('kpi-margin').innerText = margin.toFixed(1) + '%';
   document.getElementById('kpi-yoy').innerText = yoy;
 }
 
 function drawCharts(data) {
+  Chart.defaults.color = '#888';
+  Chart.defaults.font.family = "'Helvetica Neue', sans-serif";
+  
   const render = (id, type, chartData, options) => {
     if (chartInstances[id]) chartInstances[id].destroy();
-    chartInstances[id] = new Chart(document.getElementById(id), { type, data: chartData, options: { responsive: true, maintainAspectRatio: false, ...options } });
+    chartInstances[id] = new Chart(document.getElementById(id), { type, data: chartData, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10 } } }, ...options } });
   };
+
+  // 1. 월별 트렌드 (부드러운 곡선 적용)
   const monthlyRev = Array(12).fill(0), monthlyProf = Array(12).fill(0);
   data.forEach(d => { const idx = d.m - 1; if (isRevenue(d.type)) { monthlyRev[idx] += d.amt; monthlyProf[idx] += d.amt; } else monthlyProf[idx] -= d.amt; });
-  render('chart-monthly-trend', 'bar', {
-    labels: ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'],
-    datasets: [{ type: 'line', label: '손익', data: monthlyProf, borderColor: '#0070F3', backgroundColor: '#0070F3', tension: 0.1 }, { type: 'bar', label: '매출', data: monthlyRev, backgroundColor: '#0A2540' }]
-  });
+  render('chart-monthly-trend', 'line', {
+    labels: ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'],
+    datasets: [
+      { label: 'Revenue', data: monthlyRev, borderColor: colorCyan, backgroundColor: colorCyan, tension: 0.4, borderWidth: 3, pointRadius: 0 },
+      { label: 'Profit', data: monthlyProf, borderColor: colorGrey, backgroundColor: colorGrey, tension: 0.4, borderWidth: 2, borderDash: [5,5], pointRadius: 0 }
+    ]
+  }, { scales: { y: { grid: { color: '#F0F0F0' }, beginAtZero: true }, x: { grid: { display: false } } } });
+
+  // 2. 신규/기존 도넛 (이미지의 RISK 차트처럼 깔끔하게)
   const typeAggr = { '기존': 0, '신규': 0 };
   data.filter(d => isRevenue(d.type)).forEach(d => { if(typeAggr[d.isNew] !== undefined) typeAggr[d.isNew] += d.amt; });
-  render('chart-new-exist', 'doughnut', { labels: ['기존 사업', '신규 사업'], datasets: [{ data: [typeAggr['기존'], typeAggr['신규']], backgroundColor: ['#0A2540', '#0070F3'] }] });
+  render('chart-new-exist', 'doughnut', { 
+    labels: ['Existing', 'New'], 
+    datasets: [{ data: [typeAggr['기존'], typeAggr['신규']], backgroundColor: [colorCyan, colorGrey], borderWidth: 0, cutout: '75%' }] 
+  });
+
+  // 3. 본부별 매출
   const hqMap = {}; data.filter(d=>isRevenue(d.type)).forEach(d => { hqMap[d.hq] = (hqMap[d.hq]||0) + d.amt; });
-  render('chart-hq-share', 'pie', { labels: Object.keys(hqMap), datasets: [{ data: Object.values(hqMap), backgroundColor: ['#0A2540', '#0070F3', '#85C1E9', '#E5E7EB'] }] });
+  render('chart-hq-share', 'pie', { 
+    labels: Object.keys(hqMap), 
+    datasets: [{ data: Object.values(hqMap), backgroundColor: [colorCyan, colorBlue, '#A7C4E5', colorGrey], borderWidth: 0 }] 
+  });
+
+  // 4. 팀별 순위 막대 (가로형)
   const teamMap = {}; data.filter(d=>isRevenue(d.type)).forEach(d => { teamMap[d.team] = (teamMap[d.team]||0) + d.amt; });
   const sortedTeams = Object.entries(teamMap).sort((a,b)=>b[1]-a[1]).slice(0, 10);
-  render('chart-team-comp', 'bar', { labels: sortedTeams.map(t => t[0]), datasets: [{ label: '매출', data: sortedTeams.map(t => t[1]), backgroundColor: '#0A2540' }] }, { indexAxis: 'y' });
+  render('chart-team-comp', 'bar', { 
+    labels: sortedTeams.map(t => t[0]), 
+    datasets: [{ label: 'Revenue', data: sortedTeams.map(t => t[1]), backgroundColor: colorCyan, borderRadius: 3 }] 
+  }, { indexAxis: 'y', scales: { x: { grid: { display: false } }, y: { grid: { display: false } } } });
 }
 
 function drawTable(data) {
   const tbody = document.querySelector('#detail-table tbody'); tbody.innerHTML = '';
   const summary = {};
   data.forEach(d => {
-    const key = `${d.y}-${d.m}|${d.hq}|${d.team}|${d.client}|${d.unit}|${d.isNew}`;
+    const key = `${d.y}-${d.m.toString().padStart(2,'0')}|${d.hq}|${d.team}|${d.client}|${d.unit}|${d.isNew}`;
     if(!summary[key]) summary[key] = { rev: 0, cost: 0 };
     if(isRevenue(d.type)) summary[key].rev += d.amt; else summary[key].cost += d.amt;
   });
@@ -148,11 +178,12 @@ function drawTable(data) {
     const [ym, hq, team, client, unit, isNew] = key.split('|');
     const profit = row.rev - row.cost;
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${ym}</td><td>${hq}</td><td>${team}</td><td>${client}</td><td>${unit}</td><td>${isNew}</td><td>${formatMoney(row.rev)}</td><td>${formatMoney(row.cost)}</td><td style="color: ${profit < 0 ? 'red' : 'inherit'}">${formatMoney(profit)}</td>`;
+    tr.innerHTML = `<td>${ym}</td><td>${hq}</td><td>${team}</td><td>${client}</td><td>${unit}</td><td>${isNew}</td><td>${formatMoney(row.rev)}</td><td>${formatMoney(row.cost)}</td><td style="color: ${profit < 0 ? '#E74C3C' : 'inherit'}; font-weight:bold;">${formatMoney(profit)}</td>`;
     tbody.appendChild(tr);
   });
 }
 
+// 탭 버튼 이벤트
 document.querySelectorAll('.tab-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.tab-btn, .tab-content').forEach(el => el.classList.remove('active'));
