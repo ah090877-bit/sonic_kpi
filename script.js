@@ -1,18 +1,11 @@
-// [script.js]
-// 알려주신 웹 앱 URL 세팅 완료
-const API_URL = 'https://script.google.com/macros/s/AKfycbxoRToFFWcjmzjxxYkvPHourAy9C3FxTBWzoASIgiKBWkyofecavJCVyCo8hRy306gq/exec';
+// ★ 반드시 새로 배포하여 발급받은 최신 URL로 수정해 주세요!
+const API_URL = '여기에_새_웹앱_URL을_붙여넣으세요';
 
 let rawData = [];
 let chartInstances = {};
-const state = { year: 'All', month: 'All', hq: 'All', team: 'All', isNew: 'All', client: 'All' };
-const formatMoney = (val) => (val / 1000000).toLocaleString('ko-KR', { maximumFractionDigits: 0 });
-const isRevenue = (type) => type === '매출';
+const state = { year: 'All', month: 'All', hq: 'All', team: 'All', client: 'All' };
 
-// 디자인 컬러 변수
-const colorCyan = '#00C4CC';
-const colorBlue = '#4A90E2';
-const colorBg = '#F0F4F8';
-const colorGrey = '#EAECEF';
+const formatMoney = (val) => (val / 1000000).toLocaleString('ko-KR', { maximumFractionDigits: 0 });
 
 function fetchData() {
   document.getElementById('loader').style.display = 'flex';
@@ -21,36 +14,37 @@ function fetchData() {
   fetch(API_URL)
     .then(response => response.json())
     .then(data => initApp(data))
-    .catch(error => alert("데이터 로드 실패: " + error));
+    .catch(error => alert("데이터 동기화 실패: " + error));
 }
 
 function initApp(response) {
   if (!response.success) { alert("오류: " + response.error); return; }
   rawData = response.data;
+  
   const years = [...new Set(rawData.map(d => d.y))].sort((a,b)=>b-a);
   if(years.length > 0) state.year = years[0].toString();
-  buildFilters(); 
+  
+  buildTopFilters(); 
+  buildClientSidebar(); // 왼쪽 화주사 메뉴 생성
   updateDashboard();
   
   document.getElementById('loader').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
 }
 
-function buildFilters() {
+function buildTopFilters() {
   const filterDataFor = (skipKey) => rawData.filter(d => {
     if (skipKey !== 'year' && state.year !== 'All' && String(d.y) !== state.year) return false;
     if (skipKey !== 'month' && state.month !== 'All' && String(d.m) !== state.month) return false;
     if (skipKey !== 'hq' && state.hq !== 'All' && d.hq !== state.hq) return false;
     if (skipKey !== 'team' && state.team !== 'All' && d.team !== state.team) return false;
-    if (skipKey !== 'isNew' && state.isNew !== 'All' && d.isNew !== state.isNew) return false;
     return true;
   });
+  
   populateSelect('f-year', [...new Set(filterDataFor('year').map(d => d.y))].sort((a,b)=>b-a), state.year, true);
   populateSelect('f-month', [...new Set(filterDataFor('month').map(d => d.m))].sort((a,b)=>a-b), state.month, true);
   populateSelect('f-hq', [...new Set(filterDataFor('hq').map(d => d.hq))].sort(), state.hq, true);
   populateSelect('f-team', [...new Set(filterDataFor('team').map(d => d.team))].sort(), state.team, true);
-  populateSelect('f-isnew', [...new Set(filterDataFor('isNew').map(d => d.isNew))].sort(), state.isNew, true);
-  populateSelect('f-client', [...new Set(filterDataFor('client').map(d => d.client))].sort(), state.client, true);
 }
 
 function populateSelect(id, options, selected, addAll) {
@@ -60,7 +54,7 @@ function populateSelect(id, options, selected, addAll) {
   if (currentVal !== 'All' && !options.includes(currentVal) && !options.includes(Number(currentVal))) {
     currentVal = 'All'; state[key] = 'All'; 
   }
-  el.innerHTML = addAll ? '<option value="All">ALL</option>' : '';
+  el.innerHTML = addAll ? '<option value="All">전체</option>' : '';
   options.forEach(opt => {
     const option = document.createElement('option');
     option.value = opt; option.text = (id === 'f-month') ? opt + '월' : opt;
@@ -69,12 +63,54 @@ function populateSelect(id, options, selected, addAll) {
   });
   el.onchange = (e) => {
     state[key] = e.target.value;
-    if (key === 'year') { state.month = 'All'; state.hq = 'All'; state.team = 'All'; state.client = 'All'; }
-    else if (key === 'month') { state.hq = 'All'; state.team = 'All'; state.client = 'All'; }
-    else if (key === 'hq') { state.team = 'All'; state.client = 'All'; }
-    else if (key === 'team') { state.client = 'All'; }
-    buildFilters(); updateDashboard();
+    if (key === 'year') { state.month = 'All'; state.hq = 'All'; state.team = 'All'; }
+    else if (key === 'month') { state.hq = 'All'; state.team = 'All'; }
+    else if (key === 'hq') { state.team = 'All'; }
+    buildTopFilters(); 
+    buildClientSidebar(); // 상단 필터 변경 시 화주사 리스트도 업데이트
+    updateDashboard();
   };
+}
+
+function buildClientSidebar() {
+  const currentData = rawData.filter(d => {
+    if (state.year !== 'All' && String(d.y) !== state.year) return false;
+    if (state.month !== 'All' && String(d.m) !== state.month) return false;
+    if (state.hq !== 'All' && d.hq !== state.hq) return false;
+    if (state.team !== 'All' && d.team !== state.team) return false;
+    return true;
+  });
+  
+  const clients = [...new Set(currentData.map(d => d.client))].sort();
+  const listEl = document.getElementById('client-list');
+  listEl.innerHTML = '';
+  
+  if (state.client !== 'All' && !clients.includes(state.client)) { state.client = 'All'; }
+  
+  const liAll = document.createElement('li');
+  liAll.className = 'client-item' + (state.client === 'All' ? ' active' : '');
+  liAll.innerText = '전체 화주사';
+  liAll.onclick = () => selectClient('All');
+  listEl.appendChild(liAll);
+  
+  clients.forEach(c => {
+    const li = document.createElement('li');
+    li.className = 'client-item' + (state.client === c ? ' active' : '');
+    li.innerText = c;
+    li.onclick = () => selectClient(c);
+    listEl.appendChild(li);
+  });
+}
+
+function selectClient(clientName) {
+  state.client = clientName;
+  document.querySelectorAll('.client-item').forEach(el => {
+    el.classList.remove('active');
+    if (el.innerText === (clientName === 'All' ? '전체 화주사' : clientName)) {
+      el.classList.add('active');
+    }
+  });
+  updateDashboard();
 }
 
 function getFilteredData() {
@@ -83,7 +119,6 @@ function getFilteredData() {
     if (state.month !== 'All' && String(d.m) !== state.month) return false;
     if (state.hq !== 'All' && d.hq !== state.hq) return false;
     if (state.team !== 'All' && d.team !== state.team) return false;
-    if (state.isNew !== 'All' && d.isNew !== state.isNew) return false;
     if (state.client !== 'All' && d.client !== state.client) return false;
     return true;
   });
@@ -91,104 +126,110 @@ function getFilteredData() {
 
 function updateDashboard() {
   const currentData = getFilteredData();
-  updateKPIs(currentData); drawCharts(currentData); drawTable(currentData);
-}
-
-function updateKPIs(data) {
-  let rev = 0, cost = 0, newRev = 0, existRev = 0;
-  data.forEach(d => {
-    if (isRevenue(d.type)) { rev += d.amt; if (d.isNew === '신규') newRev += d.amt; else existRev += d.amt; } 
-    else { cost += d.amt; }
-  });
-  const profit = rev - cost;
-  const margin = rev === 0 ? 0 : (profit / rev) * 100;
-  let prevRev = 0, currRev = 0;
-  if (state.year !== 'All') {
-    const targetYear = parseInt(state.year);
-    rawData.forEach(d => {
-      let match = (state.month === 'All' || String(d.m) === state.month) && (state.hq === 'All' || d.hq === state.hq) && (state.team === 'All' || d.team === state.team);
-      if (match && isRevenue(d.type)) { if (d.y === targetYear) currRev += d.amt; if (d.y === targetYear - 1) prevRev += d.amt; }
-    });
-  }
-  const yoy = prevRev === 0 ? '-' : (((currRev - prevRev) / prevRev) * 100).toFixed(1) + '%';
   
-  document.getElementById('kpi-rev').innerText = formatMoney(rev);
-  document.getElementById('kpi-exist').innerText = formatMoney(existRev);
-  document.getElementById('kpi-new').innerText = formatMoney(newRev);
-  document.getElementById('kpi-profit').innerText = formatMoney(profit);
-  document.getElementById('kpi-margin').innerText = margin.toFixed(1) + '%';
-  document.getElementById('kpi-yoy').innerText = yoy;
+  // KPI 계산 로직 (요청하신 공식 반영)
+  let revTrans = 0, revLease = 0, varCost = 0, fixCost = 0;
+  
+  currentData.forEach(d => {
+    if (d.type === '매출') {
+      if (d.subject === '지입료수입') revLease += d.amt;
+      else revTrans += d.amt;
+    } else if (d.type === '변동원가') { varCost += d.amt; } 
+    else if (d.type === '고정원가') { fixCost += d.amt; }
+  });
+
+  const totalRev = revTrans + revLease;
+  const cm = totalRev - varCost; // 공헌이익
+  const cmRatio = totalRev === 0 ? 0 : (cm / totalRev) * 100;
+  const gp = cm - fixCost; // 매출이익 (매출-변동-고정)
+  const gpRatio = totalRev === 0 ? 0 : (gp / totalRev) * 100;
+
+  document.getElementById('kpi-rev').innerText = formatMoney(totalRev);
+  document.getElementById('kpi-rev-trans').innerText = formatMoney(revTrans);
+  document.getElementById('kpi-rev-lease').innerText = formatMoney(revLease);
+  document.getElementById('kpi-var-cost').innerText = formatMoney(varCost);
+  document.getElementById('kpi-cm').innerText = formatMoney(cm);
+  document.getElementById('kpi-cm-ratio').innerText = cmRatio.toFixed(1) + '%';
+  document.getElementById('kpi-fix-cost').innerText = formatMoney(fixCost);
+  document.getElementById('kpi-gp').innerText = formatMoney(gp);
+  document.getElementById('kpi-gp-ratio').innerText = gpRatio.toFixed(1) + '%';
+
+  drawCharts(currentData);
+  drawTable(currentData);
 }
 
 function drawCharts(data) {
-  Chart.defaults.color = '#888';
-  Chart.defaults.font.family = "'Helvetica Neue', sans-serif";
-  
+  Chart.defaults.font.family = "'Malgun Gothic', sans-serif";
   const render = (id, type, chartData, options) => {
     if (chartInstances[id]) chartInstances[id].destroy();
-    chartInstances[id] = new Chart(document.getElementById(id), { type, data: chartData, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10 } } }, ...options } });
+    chartInstances[id] = new Chart(document.getElementById(id), { type, data: chartData, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, ...options } });
   };
 
-  // 1. 월별 트렌드 (부드러운 곡선 적용)
-  const monthlyRev = Array(12).fill(0), monthlyProf = Array(12).fill(0);
-  data.forEach(d => { const idx = d.m - 1; if (isRevenue(d.type)) { monthlyRev[idx] += d.amt; monthlyProf[idx] += d.amt; } else monthlyProf[idx] -= d.amt; });
+  // 1. 월별 트렌드
+  const mRev = Array(12).fill(0), mCM = Array(12).fill(0), mGP = Array(12).fill(0);
+  data.forEach(d => { 
+    const idx = d.m - 1; 
+    if (d.type === '매출') { mRev[idx] += d.amt; mCM[idx] += d.amt; mGP[idx] += d.amt; } 
+    else if (d.type === '변동원가') { mCM[idx] -= d.amt; mGP[idx] -= d.amt; }
+    else if (d.type === '고정원가') { mGP[idx] -= d.amt; }
+  });
+
   render('chart-monthly-trend', 'line', {
-    labels: ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'],
+    labels: ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'],
     datasets: [
-      { label: 'Revenue', data: monthlyRev, borderColor: colorCyan, backgroundColor: colorCyan, tension: 0.4, borderWidth: 3, pointRadius: 0 },
-      { label: 'Profit', data: monthlyProf, borderColor: colorGrey, backgroundColor: colorGrey, tension: 0.4, borderWidth: 2, borderDash: [5,5], pointRadius: 0 }
+      { label: '매출', data: mRev, borderColor: '#777', backgroundColor: '#777', tension: 0.3, borderWidth: 2, borderDash: [5,5] },
+      { label: '공헌이익', data: mCM, borderColor: '#00A6B2', backgroundColor: '#00A6B2', tension: 0.3, borderWidth: 3 },
+      { label: '매출이익', data: mGP, borderColor: '#F39C12', backgroundColor: '#F39C12', tension: 0.3, borderWidth: 3 }
     ]
-  }, { scales: { y: { grid: { color: '#F0F0F0' }, beginAtZero: true }, x: { grid: { display: false } } } });
-
-  // 2. 신규/기존 도넛 (이미지의 RISK 차트처럼 깔끔하게)
-  const typeAggr = { '기존': 0, '신규': 0 };
-  data.filter(d => isRevenue(d.type)).forEach(d => { if(typeAggr[d.isNew] !== undefined) typeAggr[d.isNew] += d.amt; });
-  render('chart-new-exist', 'doughnut', { 
-    labels: ['Existing', 'New'], 
-    datasets: [{ data: [typeAggr['기존'], typeAggr['신규']], backgroundColor: [colorCyan, colorGrey], borderWidth: 0, cutout: '75%' }] 
   });
 
-  // 3. 본부별 매출
-  const hqMap = {}; data.filter(d=>isRevenue(d.type)).forEach(d => { hqMap[d.hq] = (hqMap[d.hq]||0) + d.amt; });
-  render('chart-hq-share', 'pie', { 
-    labels: Object.keys(hqMap), 
-    datasets: [{ data: Object.values(hqMap), backgroundColor: [colorCyan, colorBlue, '#A7C4E5', colorGrey], borderWidth: 0 }] 
+  // 2. 구조 비율 (도넛)
+  let sumRev=0, sumVar=0, sumFix=0;
+  data.forEach(d => {
+    if(d.type === '매출') sumRev += d.amt;
+    else if(d.type === '변동원가') sumVar += d.amt;
+    else if(d.type === '고정원가') sumFix += d.amt;
   });
+  let sumGP = sumRev - sumVar - sumFix;
+  if(sumGP < 0) sumGP = 0; // 마이너스 이익일 경우 도넛 차트 방어 로직
 
-  // 4. 팀별 순위 막대 (가로형)
-  const teamMap = {}; data.filter(d=>isRevenue(d.type)).forEach(d => { teamMap[d.team] = (teamMap[d.team]||0) + d.amt; });
-  const sortedTeams = Object.entries(teamMap).sort((a,b)=>b[1]-a[1]).slice(0, 10);
-  render('chart-team-comp', 'bar', { 
-    labels: sortedTeams.map(t => t[0]), 
-    datasets: [{ label: 'Revenue', data: sortedTeams.map(t => t[1]), backgroundColor: colorCyan, borderRadius: 3 }] 
-  }, { indexAxis: 'y', scales: { x: { grid: { display: false } }, y: { grid: { display: false } } } });
+  render('chart-cost-structure', 'doughnut', { 
+    labels: ['매출이익', '변동원가', '고정원가'], 
+    datasets: [{ data: [sumGP, sumVar, sumFix], backgroundColor: ['#00A6B2', '#2E79B5', '#E2E6EB'], borderWidth: 0 }] 
+  });
 }
 
 function drawTable(data) {
   const tbody = document.querySelector('#detail-table tbody'); tbody.innerHTML = '';
   const summary = {};
+  
   data.forEach(d => {
-    const key = `${d.y}-${d.m.toString().padStart(2,'0')}|${d.hq}|${d.team}|${d.client}|${d.unit}|${d.isNew}`;
-    if(!summary[key]) summary[key] = { rev: 0, cost: 0 };
-    if(isRevenue(d.type)) summary[key].rev += d.amt; else summary[key].cost += d.amt;
+    const key = `${d.y}-${String(d.m).padStart(2,'0')}|${d.hq}|${d.team}|${d.client}|${d.unit}`;
+    if(!summary[key]) summary[key] = { rev: 0, varC: 0, fixC: 0 };
+    if(d.type === '매출') summary[key].rev += d.amt;
+    else if (d.type === '변동원가') summary[key].varC += d.amt;
+    else if (d.type === '고정원가') summary[key].fixC += d.amt;
   });
+
   Object.keys(summary).forEach(key => {
     const row = summary[key];
-    if (row.rev === 0 && row.cost === 0) return; 
-    const [ym, hq, team, client, unit, isNew] = key.split('|');
-    const profit = row.rev - row.cost;
+    if (row.rev === 0 && row.varC === 0 && row.fixC === 0) return; 
+    
+    const [ym, hq, team, client, unit] = key.split('|');
+    const cm = row.rev - row.varC;
+    const gp = cm - row.fixC;
+    
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${ym}</td><td>${hq}</td><td>${team}</td><td>${client}</td><td>${unit}</td><td>${isNew}</td><td>${formatMoney(row.rev)}</td><td>${formatMoney(row.cost)}</td><td style="color: ${profit < 0 ? '#E74C3C' : 'inherit'}; font-weight:bold;">${formatMoney(profit)}</td>`;
+    tr.innerHTML = `
+      <td>${ym}</td><td>${hq}</td><td>${team}</td><td>${client}</td><td>${unit}</td>
+      <td style="font-weight:bold;">${formatMoney(row.rev)}</td>
+      <td>${formatMoney(row.varC)}</td>
+      <td style="color:#00A6B2; font-weight:bold;">${formatMoney(cm)}</td>
+      <td>${formatMoney(row.fixC)}</td>
+      <td style="color:${gp < 0 ? '#E74C3C' : '#F39C12'}; font-weight:bold;">${formatMoney(gp)}</td>
+    `;
     tbody.appendChild(tr);
   });
 }
-
-// 탭 버튼 이벤트
-document.querySelectorAll('.tab-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.tab-btn, .tab-content').forEach(el => el.classList.remove('active'));
-    btn.classList.add('active'); document.getElementById(btn.dataset.target).classList.add('active');
-  });
-});
 
 window.onload = fetchData;
