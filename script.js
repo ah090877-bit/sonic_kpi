@@ -1,9 +1,9 @@
-// ★ 기존에 쓰시던 URL 유지하세요!
+// ★ 기존에 쓰시던 URL 그대로 유지하세요!
 const API_URL = 'https://script.google.com/macros/s/AKfycbxoRToFFWcjmzjxxYkvPHourAy9C3FxTBWzoASIgiKBWkyofecavJCVyCo8hRy306gq/exec';
 
 let rawData = [];
 let chartInstances = {};
-const state = { year: 'All', month: 'All', hq: 'All', team: 'All' };
+const state = { year: 'All', month: 'All', hq: 'All', team: 'All', client: 'All' };
 
 const formatMoney = (val) => val.toLocaleString('ko-KR');
 
@@ -16,13 +16,14 @@ function fetchData() {
 function initApp(response) {
   if (!response.success) { alert("오류: " + response.error); return; }
   
-  // ★ 요청사항: '화주공통비'는 화주사별 분석에서 완전히 제외합니다.
+  // 요청사항: 화주공통비 제외
   rawData = response.data.filter(d => d.client !== '화주공통비');
   
   const years = [...new Set(rawData.map(d => d.y))].sort((a,b)=>b-a);
   if(years.length > 0) state.year = years[0].toString();
   
   buildTopFilters(); 
+  buildClientSidebar();
   updateDashboard();
   
   document.getElementById('loader').style.display = 'none';
@@ -61,15 +62,73 @@ function populateSelect(id, options, selected, addAll) {
   });
   el.onchange = (e) => {
     state[key] = e.target.value;
-    if (key === 'year') { state.month = 'All'; state.hq = 'All'; state.team = 'All'; }
-    else if (key === 'month') { state.hq = 'All'; state.team = 'All'; }
-    else if (key === 'hq') { state.team = 'All'; }
-    buildTopFilters(); updateDashboard();
+    if (key === 'year') { state.month = 'All'; state.hq = 'All'; state.team = 'All'; state.client = 'All'; }
+    else if (key === 'month') { state.hq = 'All'; state.team = 'All'; state.client = 'All'; }
+    else if (key === 'hq') { state.team = 'All'; state.client = 'All'; }
+    else if (key === 'team') { state.client = 'All'; }
+    buildTopFilters(); 
+    buildClientSidebar(); 
+    updateDashboard();
   };
 }
 
-// 🌟 메인 화면: 화주사 카드 그리기
+// 🌟 화주사 왼쪽 사이드바 생성
+function buildClientSidebar() {
+  const currData = rawData.filter(d => {
+    if (state.year !== 'All' && String(d.y) !== state.year) return false;
+    if (state.month !== 'All' && String(d.m) !== state.month) return false;
+    if (state.hq !== 'All' && d.hq !== state.hq) return false;
+    if (state.team !== 'All' && d.team !== state.team) return false;
+    return true;
+  });
+  
+  const clients = [...new Set(currData.map(d => d.client))].sort();
+  const listEl = document.getElementById('client-list');
+  listEl.innerHTML = '';
+  
+  if (state.client !== 'All' && !clients.includes(state.client)) { state.client = 'All'; }
+  
+  const liAll = document.createElement('li');
+  liAll.className = 'client-item' + (state.client === 'All' ? ' active' : '');
+  liAll.innerText = '🔹 화주사 전체 요약 뷰';
+  liAll.onclick = () => selectClient('All');
+  listEl.appendChild(liAll);
+  
+  clients.forEach(c => {
+    const li = document.createElement('li');
+    li.className = 'client-item' + (state.client === c ? ' active' : '');
+    li.innerText = c;
+    li.onclick = () => selectClient(c);
+    listEl.appendChild(li);
+  });
+}
+
+function selectClient(clientName) {
+  state.client = clientName;
+  document.querySelectorAll('.client-item').forEach(el => {
+    el.classList.remove('active');
+    if (el.innerText.includes(clientName === 'All' ? '전체 요약 뷰' : clientName)) {
+      el.classList.add('active');
+    }
+  });
+  updateDashboard();
+}
+
+// 🌟 대시보드 뷰 스위칭 (전체 카드 뷰 vs 단일 상세 뷰)
 function updateDashboard() {
+  if (state.client === 'All') {
+    document.getElementById('view-multi').style.display = 'block';
+    document.getElementById('view-single').style.display = 'none';
+    renderCardGrid();
+  } else {
+    document.getElementById('view-multi').style.display = 'none';
+    document.getElementById('view-single').style.display = 'block';
+    renderSingleClientDetail();
+  }
+}
+
+// 뷰 1: 모던한 화주사 요약 카드 생성
+function renderCardGrid() {
   const currYear = parseInt(state.year);
   const container = document.getElementById('card-container');
   container.innerHTML = '';
@@ -86,7 +145,6 @@ function updateDashboard() {
   currData.forEach(d => {
     const key = `${d.hq}|${d.team}|${d.client}`;
     if (!summary[key]) summary[key] = { hq: d.hq, team: d.team, client: d.client, revTrans: 0, revLease: 0, varC: 0, fixC: 0 };
-    
     if (d.type === '매출') { if (d.subject === '지입료수입') summary[key].revLease += d.amt; else summary[key].revTrans += d.amt; }
     else if (d.type === '변동원가') summary[key].varC += d.amt;
     else if (d.type === '고정원가') summary[key].fixC += d.amt;
@@ -103,39 +161,42 @@ function updateDashboard() {
 
     const card = document.createElement('div');
     card.className = 'client-card';
-    card.onclick = () => openModal(row.hq, row.team, row.client);
+    card.onclick = () => { selectClient(row.client); }; // 카드 클릭 시 해당 화주사 단일 뷰로 전환
     
-    // 첨부 이미지와 완벽히 동일한 표 렌더링
+    // 모던한 SaaS 스타일 텍스트 카드 렌더링
     card.innerHTML = `
-      <div class="card-header">
-        ${row.client}
-        <div class="card-team-label">(${row.team})</div>
-      </div>
-      <table class="card-table">
-        <tr><th>매출_운송수입</th><td>${formatMoney(row.revTrans)}</td></tr>
-        <tr class="row-blue"><th>매출_지입료수입</th><td>${formatMoney(row.revLease)}</td></tr>
-        <tr class="row-yellow"><th>변동원가</th><td>${formatMoney(row.varC)}</td></tr>
-        <tr><th>공헌이익</th><td class="${cm < 0 ? 'txt-red' : ''}">${formatMoney(cm)}</td></tr>
-        <tr><th>공헌이익율</th><td class="${cmRatio < 0 ? 'txt-red' : ''}">${cmRatio.toFixed(2)}%</td></tr>
-        <tr class="row-yellow"><th>고정원가</th><td>${formatMoney(row.fixC)}</td></tr>
-        <tr class="row-bold"><th>매출이익</th><td class="${gp < 0 ? 'txt-red' : ''}">${formatMoney(gp)}</td></tr>
-        <tr class="row-bold"><th>매출이익율</th><td class="${gpRatio < 0 ? 'txt-red' : ''}">${gpRatio.toFixed(2)}%</td></tr>
-      </table>
+      <div class="card-title">${row.client}</div>
+      <div class="card-team">${row.hq} / ${row.team}</div>
+      
+      <div class="card-row"><span>운송수입</span><span class="val">${formatMoney(row.revTrans)}</span></div>
+      <div class="card-row"><span>지입료수입</span><span class="val">${formatMoney(row.revLease)}</span></div>
+      <div class="card-row"><span>변동원가</span><span class="val">${formatMoney(row.varC)}</span></div>
+      
+      <div class="card-row border-top bold"><span>공헌이익</span><span class="val ${cm < 0 ? 'txt-red' : ''}">${formatMoney(cm)}</span></div>
+      <div class="card-row bold"><span>공헌이익률</span><span class="val ${cmRatio < 0 ? 'txt-red' : ''}">${cmRatio.toFixed(1)}%</span></div>
+      
+      <div class="card-row border-top"><span>고정원가</span><span class="val">${formatMoney(row.fixC)}</span></div>
+      
+      <div class="card-row border-top highlight"><span>매출이익</span><span class="val ${gp < 0 ? 'txt-red' : ''}">${formatMoney(gp)}</span></div>
+      <div class="card-row highlight"><span>매출이익률</span><span class="val ${gpRatio < 0 ? 'txt-red' : ''}">${gpRatio.toFixed(1)}%</span></div>
     `;
     container.appendChild(card);
   });
 }
 
-// 🌟 화주사 카드 클릭 시 팝업 띄우기
-function openModal(hq, team, client) {
+// 뷰 2: 단일 화주사 상세 분석 (전년비, 차트)
+function renderSingleClientDetail() {
   const currYear = parseInt(state.year);
   
-  document.getElementById('modal-title').innerText = client;
-  document.getElementById('modal-subtitle').innerText = `${hq} / ${team} / ${currYear}년 ${state.month === 'All' ? '전체' : state.month+'월'} 실적`;
+  // 상단 타이틀 업데이트
+  const currentDataCheck = rawData.find(d => d.client === state.client && d.y === currYear);
+  const hq = currentDataCheck ? currentDataCheck.hq : '-';
+  const team = currentDataCheck ? currentDataCheck.team : '-';
+  document.getElementById('detail-title').innerText = state.client;
+  document.getElementById('detail-subtitle').innerText = `${hq} / ${team} / ${currYear}년 ${state.month === 'All' ? '전체' : state.month+'월'}`;
   
-  // 모달용 데이터 (선택한 화주사/팀 고정)
-  const mCurrData = rawData.filter(d => d.y === currYear && d.hq === hq && d.team === team && d.client === client && (state.month === 'All' || String(d.m) === state.month));
-  const mPrevData = rawData.filter(d => d.y === currYear - 1 && d.hq === hq && d.team === team && d.client === client && (state.month === 'All' || String(d.m) === state.month));
+  const mCurrData = rawData.filter(d => d.y === currYear && d.client === state.client && (state.month === 'All' || String(d.m) === state.month));
+  const mPrevData = rawData.filter(d => d.y === currYear - 1 && d.client === state.client && (state.month === 'All' || String(d.m) === state.month));
   
   let currRev = 0, currVar = 0, currFix = 0;
   mCurrData.forEach(d => { if(d.type==='매출') currRev+=d.amt; else if(d.type==='변동원가') currVar+=d.amt; else if(d.type==='고정원가') currFix+=d.amt; });
@@ -146,18 +207,17 @@ function openModal(hq, team, client) {
   mPrevData.forEach(d => { if(d.type==='매출') prevRev+=d.amt; else if(d.type==='변동원가') prevVar+=d.amt; else if(d.type==='고정원가') prevFix+=d.amt; });
   const prevGp = (prevRev - prevVar) - prevFix;
 
-  document.getElementById('m-kpi-rev').innerText = formatMoney(currRev);
-  document.getElementById('m-kpi-cm').innerText = formatMoney(currCm);
-  document.getElementById('m-kpi-cm-rate').innerText = currRev === 0 ? '0%' : (currCm/currRev*100).toFixed(1)+'%';
-  document.getElementById('m-kpi-gp').innerText = formatMoney(currGp);
-  document.getElementById('m-kpi-gp-rate').innerText = currRev === 0 ? '0%' : (currGp/currRev*100).toFixed(1)+'%';
+  document.getElementById('s-kpi-rev').innerText = formatMoney(currRev);
+  document.getElementById('s-kpi-cm').innerText = formatMoney(currCm);
+  document.getElementById('s-kpi-cm-ratio').innerText = currRev === 0 ? '0%' : (currCm/currRev*100).toFixed(1)+'%';
+  document.getElementById('s-kpi-gp').innerText = formatMoney(currGp);
+  document.getElementById('s-kpi-gp-ratio').innerText = currRev === 0 ? '0%' : (currGp/currRev*100).toFixed(1)+'%';
   
-  applyYoYBadge('m-kpi-yoy-rev', currRev, prevRev);
-  applyYoYBadge('m-kpi-yoy-gp', currGp, prevGp);
+  applyYoYBadge('s-kpi-yoy-rev', currRev, prevRev);
+  applyYoYBadge('s-kpi-yoy-gp', currGp, prevGp);
 
-  // 모달 차트: 해당 화주사의 1년치 월별 데이터 추출
-  const annualCurr = rawData.filter(d => d.y === currYear && d.hq === hq && d.team === team && d.client === client);
-  const annualPrev = rawData.filter(d => d.y === currYear - 1 && d.hq === hq && d.team === team && d.client === client);
+  const annualCurr = rawData.filter(d => d.y === currYear && d.client === state.client);
+  const annualPrev = rawData.filter(d => d.y === currYear - 1 && d.client === state.client);
   
   const m1Rev = Array(12).fill(0), m1CM = Array(12).fill(0), m1GP = Array(12).fill(0);
   annualCurr.forEach(d => { const i = d.m-1; if(d.type==='매출'){ m1Rev[i]+=d.amt; m1CM[i]+=d.amt; m1GP[i]+=d.amt; } else if(d.type==='변동원가'){ m1CM[i]-=d.amt; m1GP[i]-=d.amt; } else if(d.type==='고정원가') m1GP[i]-=d.amt; });
@@ -171,28 +231,22 @@ function openModal(hq, team, client) {
     chartInstances[id] = new Chart(document.getElementById(id), { type, data: dts, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, ...opt } });
   };
 
-  render('modal-chart-trend', 'line', {
+  render('chart-single-trend', 'line', {
     labels: ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'],
     datasets: [
-      { label: '매출', data: m1Rev, borderColor: '#777', backgroundColor: '#777', tension: 0.3, borderDash: [5,5] },
-      { label: '공헌이익', data: m1CM, borderColor: '#00A6B2', backgroundColor: '#00A6B2', tension: 0.3 },
-      { label: '매출이익', data: m1GP, borderColor: '#F39C12', backgroundColor: '#F39C12', tension: 0.3 }
+      { label: '매출', data: m1Rev, borderColor: '#B0BEC5', backgroundColor: 'transparent', tension: 0.3, borderDash: [5,5] },
+      { label: '공헌이익', data: m1CM, borderColor: '#00A6B2', backgroundColor: '#00A6B2', tension: 0.3, borderWidth: 3 },
+      { label: '매출이익', data: m1GP, borderColor: '#F39C12', backgroundColor: '#F39C12', tension: 0.3, borderWidth: 3 }
     ]
   });
 
-  render('modal-chart-yoy', 'bar', {
+  render('chart-single-yoy', 'bar', {
     labels: ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'],
     datasets: [
-      { label: `${currYear}년 매출`, data: m1Rev, backgroundColor: '#00A6B2' },
-      { label: `${currYear-1}년 매출`, data: m2Rev, backgroundColor: '#E2E6EB' }
+      { label: `${currYear}년 매출`, data: m1Rev, backgroundColor: '#00A6B2', borderRadius: 4 },
+      { label: `${currYear-1}년 매출`, data: m2Rev, backgroundColor: '#E9ECEF', borderRadius: 4 }
     ]
   });
-
-  document.getElementById('detail-modal').style.display = 'flex';
-}
-
-function closeModal() {
-  document.getElementById('detail-modal').style.display = 'none';
 }
 
 function applyYoYBadge(elementId, currVal, prevVal) {
