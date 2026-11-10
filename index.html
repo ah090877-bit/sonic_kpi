@@ -6,7 +6,7 @@
   <title>EUGENE SONIC 경영관리</title>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <link rel="stylesheet" href="style.css?v=19">
+  <link rel="stylesheet" href="style.css?v=20">
 </head>
 <body>
   <!-- 로그인 화면 -->
@@ -14,7 +14,7 @@
     <div class="login-box">
       <h2>EUGENE SONIC</h2>
       <p>경영관리 대시보드 로그인</p>
-      <input type="text" id="login-id" placeholder="아이디 입력" />
+      <input type="text" id="login-id" placeholder="아이디 입력" autocomplete="off" />
       <input type="password" id="login-pw" placeholder="비밀번호 입력" onkeypress="if(event.keyCode==13) login()" />
       <button onclick="login()">로그인</button>
       <div id="login-error" style="color: #E74C3C; font-weight: bold; margin-top: 10px; display: none;">아이디 또는 비밀번호가 틀렸습니다.</div>
@@ -28,7 +28,7 @@
       <div class="sidebar-logo"><h2>EUGENE</h2></div>
       <div class="sidebar-menu-title">실적 분석 뷰(View)</div>
       <ul class="nav-list">
-        <li class="nav-item active" data-view="hq">🏢 본부별 연간 리포트</li>
+        <li class="nav-item active" data-view="main">💡 주요 경영 지표 (인사이트)</li>
         <li class="nav-item" data-view="team">👥 팀별 연간 리포트</li>
         <li class="nav-item" data-view="client">💳 화주사별 카드 뷰</li>
       </ul>
@@ -42,14 +42,47 @@
 
       <div class="filter-bar">
         <div class="filter-group"><label>연도</label><select id="f-year"></select></div>
-        <div class="filter-group" id="filter-month-wrap"><label>월(조회기준)</label><select id="f-month"></select></div>
+        <div class="filter-group" id="filter-month-wrap"><label>월(기준월)</label><select id="f-month"></select></div>
         <div class="filter-group"><label>본부</label><select id="f-hq"></select></div>
         <div class="filter-group"><label>팀</label><select id="f-team"></select></div>
       </div>
 
       <div class="scroll-area">
         
-        <!-- 1. 본부/팀 요약 뷰 (아코디언 표가 여기에 들어감) -->
+        <!-- 🌟 신규: 주요 경영 지표 (인사이트 뷰) -->
+        <div id="view-main" style="display: none; flex-direction: column; gap: 20px;">
+          <div class="box-header"><h4 id="main-title-text">경영 인사이트</h4><span class="subtitle">선택한 기준월의 전월 대비(MoM) 실적 요약 및 특이사항입니다.</span></div>
+          
+          <div class="kpi-grid">
+            <div class="kpi-card" style="border-top-color: #4A90E2;"><h3>기준월 총 매출액</h3><p id="main-kpi-rev">-</p><div class="yoy-badge" id="main-kpi-mom-rev">-</div></div>
+            <div class="kpi-card" style="border-top-color: #00A6B2;"><h3>기준월 공헌이익</h3><p id="main-kpi-cm">-</p><div class="sub-kpi">이익률: <b id="main-kpi-cm-rate">-</b></div></div>
+            <div class="kpi-card" style="border-top-color: #F39C12;"><h3>기준월 매출이익</h3><p id="main-kpi-gp">-</p><div class="yoy-badge" id="main-kpi-mom-gp" style="margin-top: 5px;">-</div><div class="sub-kpi">이익률: <b id="main-kpi-gp-rate">-</b></div></div>
+          </div>
+          
+          <div class="kpi-grid" style="grid-template-columns: 1fr 1fr;">
+            <div class="insight-card insight-good">
+              <div class="insight-title">🚀 전월 대비 최대 매출 상승 화주사</div>
+              <div id="insight-best"></div>
+            </div>
+            <div class="insight-card insight-bad">
+              <div class="insight-title">🚨 전월 대비 최대 매출 하락 화주사</div>
+              <div id="insight-worst"></div>
+            </div>
+          </div>
+
+          <div class="chart-layout" style="grid-template-columns: 1fr 1fr;">
+            <div class="chart-box large-chart"><div class="box-header"><h4>팀별 매출 전월 비교</h4></div><div class="canvas-wrap"><canvas id="main-chart-team"></canvas></div></div>
+            <div class="table-container" style="height:420px; overflow-y:auto; margin:0;">
+              <div class="box-header"><h4>실적 급변 화주사 Top 5 (전월비)</h4></div>
+              <table class="data-table" style="min-width: 100%;">
+                <thead><tr><th>화주사명</th><th>기준월 매출</th><th>전월 매출</th><th>증감률</th><th>증감액</th></tr></thead>
+                <tbody id="main-table-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. 팀별 요약 뷰 (월 필터 삭제, 1~12월 테이블 표시) -->
         <div id="view-summary" style="display: none; flex-direction: column; gap: 20px;">
           <div class="kpi-grid">
             <div class="kpi-card" style="border-top-color: #4A90E2;"><h3>연간 누계 총 매출액</h3><p id="sum-kpi-rev">-</p><div class="yoy-badge" id="sum-kpi-yoy-rev">-</div></div>
@@ -74,10 +107,10 @@
           </div>
         </div>
 
-        <!-- 2. 화주사별 카드 뷰 -->
+        <!-- 3. 화주사별 카드 뷰 (기존/신규 분리) -->
         <div id="view-cards" style="display: none;">
           <div class="box-header" style="margin-bottom: 20px;">
-            <h4>화주사별 요약 카드</h4><span class="subtitle">해당 연/월의 실적입니다. 카드를 클릭하면 연간 상세 분석을 볼 수 있습니다.</span>
+            <h4>화주사별 요약 카드</h4><span class="subtitle">해당 기준월의 실적입니다. 카드를 클릭하면 연간 상세 분석을 볼 수 있습니다.</span>
           </div>
           <div class="section-divider"><span>🟢 기존 사업 화주사</span></div>
           <div id="card-container-exist" class="card-grid" style="margin-bottom: 50px;"></div>
@@ -85,7 +118,7 @@
           <div id="card-container-new" class="card-grid"></div>
         </div>
 
-        <!-- 3. 화주사 상세 분석 뷰 -->
+        <!-- 4. 화주사 상세 분석 뷰 (연간 데이터) -->
         <div id="view-detail" style="display: none; flex-direction: column; gap: 20px;">
           <div class="detail-header">
             <button class="btn-back" onclick="goBackToCards()">← 목록으로 돌아가기</button>
@@ -123,12 +156,11 @@
               </table>
             </div>
           </div>
-
         </div>
+
       </div>
     </div>
   </div>
-
-  <script src="script.js?v=19" defer></script>
+  <script src="script.js?v=20" defer></script>
 </body>
 </html>
