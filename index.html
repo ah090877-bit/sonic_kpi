@@ -3,31 +3,35 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>EUGENE SONIC 대시보드</title>
+  <title>EUGENE SONIC 경영관리</title>
+  <!-- Noto Sans KR 폰트 적용 -->
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <link rel="stylesheet" href="style.css?v=4">
+  <link rel="stylesheet" href="style.css?v=6">
 </head>
 <body>
-  <div id="loader" class="loader-container"><div class="spinner"></div><p>데이터 동기화 중...</p></div>
+  <div id="loader" class="loader-container"><div class="spinner"></div><p>ERP 데이터 동기화 중...</p></div>
   
   <div class="app-wrapper" style="display: none;" id="app">
-    <!-- 왼쪽 화주사 리스트 사이드바 -->
+    <!-- 좌측 사이드바 -->
     <aside class="sidebar">
       <div class="sidebar-logo"><h2>EUGENE</h2></div>
-      <div class="sidebar-menu-title">화주사 리스트</div>
-      <ul class="client-list" id="client-list">
-        <!-- 자바스크립트에서 화주사 목록 자동 생성 -->
+      <div class="sidebar-menu-title">실적 분석 뷰(View)</div>
+      <ul class="nav-list">
+        <li class="nav-item active" data-view="hq">🏢 본부별 실적 요약</li>
+        <li class="nav-item" data-view="team">👥 팀별 실적 요약</li>
+        <li class="nav-item" data-view="client">💳 화주사별 카드 뷰</li>
       </ul>
     </aside>
 
     <!-- 우측 메인 영역 -->
     <div class="main-content">
       <header class="top-header">
-        <div class="page-title">화주사별 경영관리 대시보드</div>
-        <button class="btn-refresh" onclick="fetchData()">Data Sync</button>
+        <div class="page-title">경영관리 분석 대시보드</div>
+        <button class="btn-refresh" onclick="fetchData()">데이터 새로고침</button>
       </header>
 
-      <!-- 상단 기간 및 조직 필터 -->
+      <!-- 상단 필터 -->
       <div class="filter-bar">
         <div class="filter-group"><label>연도</label><select id="f-year"></select></div>
         <div class="filter-group"><label>월</label><select id="f-month"></select></div>
@@ -35,41 +39,76 @@
         <div class="filter-group"><label>팀</label><select id="f-team"></select></div>
       </div>
 
-      <!-- 뷰 1: 전체 화주사 카드 뷰 (기본 화면) -->
-      <div id="view-multi" class="scroll-area">
-        <div id="card-container" class="card-grid">
-          <!-- 카드 자동 생성 -->
-        </div>
-      </div>
-
-      <!-- 뷰 2: 특정 화주사 상세 분석 뷰 (클릭 시 나타남) -->
-      <div id="view-single" class="scroll-area" style="display: none;">
-        <div class="detail-header">
-          <h2 id="detail-title">화주사명</h2>
-          <span id="detail-subtitle">본부 / 팀</span>
-        </div>
+      <div class="scroll-area">
         
-        <div class="kpi-grid">
-          <div class="kpi-card"><h3>총 매출</h3><p id="s-kpi-rev">-</p><div class="yoy-badge" id="s-kpi-yoy-rev">-</div></div>
-          <div class="kpi-card highlight-card"><h3>공헌이익</h3><p id="s-kpi-cm">-</p><div class="sub-kpi">이익률: <b id="s-kpi-cm-ratio">-</b></div></div>
-          <div class="kpi-card highlight-card"><h3>매출이익</h3><p id="s-kpi-gp">-</p><div class="yoy-badge" id="s-kpi-yoy-gp" style="margin-top: 5px;">-</div><div class="sub-kpi">이익률: <b id="s-kpi-gp-ratio">-</b></div></div>
-        </div>
-        
-        <div class="chart-layout" style="margin-top: 20px;">
-          <div class="chart-box large-chart">
-            <div class="box-header"><h4>월별 실적 및 이익 구조 추이</h4></div>
-            <canvas id="chart-single-trend"></canvas>
+        <!-- 뷰 1: 본부별 / 팀별 실적 (표 + 차트) -->
+        <div id="view-summary" style="display: none; flex-direction: column; gap: 20px;">
+          <div class="kpi-grid">
+            <div class="kpi-card"><h3>총 매출액</h3><p id="sum-kpi-rev">-</p><div class="yoy-badge" id="sum-kpi-yoy-rev">-</div></div>
+            <div class="kpi-card highlight-card"><h3>공헌이익</h3><p id="sum-kpi-cm">-</p><div class="sub-kpi">이익률: <b id="sum-kpi-cm-rate">-</b></div></div>
+            <div class="kpi-card highlight-card"><h3>매출이익</h3><p id="sum-kpi-gp">-</p><div class="yoy-badge" id="sum-kpi-yoy-gp" style="margin-top: 5px;">-</div><div class="sub-kpi">이익률: <b id="sum-kpi-gp-rate">-</b></div></div>
           </div>
-          <div class="chart-box large-chart">
-            <div class="box-header"><h4>전년 동기 매출 비교</h4></div>
-            <canvas id="chart-single-yoy"></canvas>
+          
+          <div class="chart-layout">
+            <div class="chart-box large-chart">
+              <div class="box-header"><h4>전년 대비 당해 연도 매출 추이</h4></div>
+              <canvas id="sum-chart-trend"></canvas>
+            </div>
+            <div class="chart-box small-chart">
+              <div class="box-header"><h4>당기 비용 및 이익 구조</h4></div>
+              <canvas id="sum-chart-cost"></canvas>
+            </div>
           </div>
-        </div>
-      </div>
 
+          <div class="table-container">
+            <div class="box-header"><h4 id="table-title">세부 실적 리포트</h4></div>
+            <div class="table-scroll">
+              <table class="data-table" id="sum-table">
+                <thead id="sum-table-head"></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- 뷰 2: 화주사별 실적 (카드 그리드) -->
+        <div id="view-cards" style="display: none;">
+          <div class="box-header" style="margin-bottom: 20px;">
+            <h4>화주사별 요약 카드</h4><span class="subtitle">카드를 클릭하면 상세 차트와 전년비 분석을 볼 수 있습니다.</span>
+          </div>
+          <div id="card-container" class="card-grid"></div>
+        </div>
+
+        <!-- 뷰 3: 특정 화주사 상세 분석 -->
+        <div id="view-detail" style="display: none; flex-direction: column; gap: 20px;">
+          <div class="detail-header">
+            <button class="btn-back" onclick="goBackToCards()">← 목록으로 돌아가기</button>
+            <h2 id="detail-title">화주사명</h2>
+            <span id="detail-subtitle">본부 / 팀</span>
+          </div>
+          
+          <div class="kpi-grid">
+            <div class="kpi-card"><h3>총 매출</h3><p id="det-kpi-rev">-</p><div class="yoy-badge" id="det-kpi-yoy-rev">-</div></div>
+            <div class="kpi-card highlight-card"><h3>공헌이익</h3><p id="det-kpi-cm">-</p><div class="sub-kpi">이익률: <b id="det-kpi-cm-rate">-</b></div></div>
+            <div class="kpi-card highlight-card"><h3>매출이익</h3><p id="det-kpi-gp">-</p><div class="yoy-badge" id="det-kpi-yoy-gp" style="margin-top: 5px;">-</div><div class="sub-kpi">이익률: <b id="det-kpi-gp-rate">-</b></div></div>
+          </div>
+          
+          <div class="chart-layout">
+            <div class="chart-box large-chart">
+              <div class="box-header"><h4>월별 실적 및 이익 구조 추이</h4></div>
+              <canvas id="det-chart-trend"></canvas>
+            </div>
+            <div class="chart-box large-chart">
+              <div class="box-header"><h4>전년 동기 매출 비교</h4></div>
+              <canvas id="det-chart-yoy"></canvas>
+            </div>
+          </div>
+        </div>
+
+      </div>
     </div>
   </div>
 
-  <script src="script.js?v=4" defer></script>
+  <script src="script.js?v=6" defer></script>
 </body>
 </html>
