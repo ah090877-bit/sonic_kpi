@@ -50,12 +50,13 @@ body { background-color: var(--bg-color); color: var(--text-main); font-size: 13
 .yoy-down { background-color: #FFEBEE; color: #C62828; }
 .yoy-none { background-color: #F8F9FA; color: #6C757D; }
 
-/* ★ 차트 잘림 방지용 CSS 업데이트 */
+/* ★ 차트 레이아웃 3열 분리 */
 .chart-layout { display: grid; grid-template-columns: 2.5fr 1fr; gap: 20px; }
-#view-detail .chart-layout { grid-template-columns: 1fr 1fr; }
+#detail-chart-layout { grid-template-columns: 1.2fr 1fr 1fr; } /* 상세 뷰는 3개 차트가 나열됨 */
+
 .chart-box { background: var(--card-bg); padding: 20px; border-radius: 10px; border: 1px solid var(--border-color); box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
-.large-chart, .small-chart { height: 420px; display: flex; flex-direction: column; } /* 높이를 420px로 확장 */
-.canvas-wrap { position: relative; flex: 1; width: 100%; min-height: 0; } /* 캔버스 비율 강제 유지 */
+.large-chart, .small-chart { height: 420px; display: flex; flex-direction: column; } 
+.canvas-wrap { position: relative; flex: 1; width: 100%; min-height: 0; } 
 .box-header { margin-bottom: 15px; }
 .box-header h4 { font-size: 16px; font-weight: 900; color: var(--text-main); }
 .box-header .subtitle { font-size: 12px; color: var(--text-muted); font-weight: 500; }
