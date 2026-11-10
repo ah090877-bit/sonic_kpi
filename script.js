@@ -1,8 +1,10 @@
+// ★ 반드시 새 배포로 발급받은 URL을 붙여넣으세요!
 const API_URL = 'https://script.google.com/macros/s/AKfycbxoRToFFWcjmzjxxYkvPHourAy9C3FxTBWzoASIgiKBWkyofecavJCVyCo8hRy306gq/exec';
 
 let rawData = [];
 let chartInstances = {};
-const state = { view: 'hq', year: 'All', month: 'All', hq: 'All', team: 'All', clientView: 'All' };
+// view 기본을 'main' (인사이트 대시보드)으로 세팅
+const state = { view: 'main', year: 'All', month: 'All', hq: 'All', team: 'All', clientView: 'All' };
 const formatMoney = (val) => val.toLocaleString('ko-KR');
 
 function login() {
@@ -40,9 +42,9 @@ function fetchData() {
 
 function initApp(response) {
   if (!response.success) { alert("데이터 로드 오류"); return; }
-  
   let fetchedData = response.data.filter(d => d.client !== '화주공통비');
   
+  // 조직 이동 최신본 자동 업데이트
   const latestOrgMap = {};
   fetchedData.sort((a, b) => (a.y !== b.y ? a.y - b.y : a.m - b.m)).forEach(d => {
     latestOrgMap[d.client] = { hq: d.hq, team: d.team };
@@ -57,7 +59,7 @@ function initApp(response) {
   if(years.length > 0) {
     state.year = years[0].toString();
     const maxMonth = Math.max(...rawData.filter(d => d.y === years[0]).map(d => d.m));
-    state.month = maxMonth.toString();
+    state.month = maxMonth.toString(); // 최신 월 기본 세팅
   }
   
   setupSidebar(); buildTopFilters(); updateDashboard();
@@ -86,6 +88,7 @@ function buildTopFilters() {
     return true;
   });
   
+  // 필터 유지 핵심 방어코드 적용
   populateSelect('f-year', [...new Set(filterDataFor('year').map(d => d.y))].sort((a,b)=>b-a), state.year, false);
   populateSelect('f-month', [...new Set(filterDataFor('month').map(d => d.m))].sort((a,b)=>a-b), state.month, true);
   populateSelect('f-hq', [...new Set(filterDataFor('hq').map(d => d.hq))].sort(), state.hq, true);
@@ -96,6 +99,7 @@ function populateSelect(id, options, selected, addAll) {
   const el = document.getElementById(id); const key = id.replace('f-', '');
   let currentVal = state[key]; 
   
+  // 내가 선택했던 팀/본부가 새로운 조건(options) 안에도 존재한다면, '전체'로 튕기지 않고 그대로 유지함!
   if (currentVal !== 'All' && !options.includes(currentVal) && !options.includes(Number(currentVal))) {
     currentVal = addAll ? 'All' : (options.length > 0 ? options[0] : ''); 
     state[key] = currentVal; 
@@ -114,29 +118,34 @@ function populateSelect(id, options, selected, addAll) {
 }
 
 function updateDashboard() {
+  const vMain = document.getElementById('view-main');
   const vSum = document.getElementById('view-summary');
   const vCard = document.getElementById('view-cards');
   const vDet = document.getElementById('view-detail');
   const monthFilter = document.getElementById('filter-month-wrap'); 
 
-  if (state.view === 'hq' || state.view === 'team') {
+  if (state.view === 'main') {
+    monthFilter.style.display = 'flex';
+    vMain.style.display = 'flex'; vSum.style.display = 'none'; vCard.style.display = 'none'; vDet.style.display = 'none';
+    renderMainDashboard();
+  } else if (state.view === 'team') {
+    // 팀별 연간 뷰에서는 월 필터 자동 숨김
     monthFilter.style.display = 'none';
-    vSum.style.display = 'flex'; vCard.style.display = 'none'; vDet.style.display = 'none';
+    vMain.style.display = 'none'; vSum.style.display = 'flex'; vCard.style.display = 'none'; vDet.style.display = 'none';
     renderSummaryView();
   } else if (state.view === 'client') {
     if (state.clientView === 'All') {
       monthFilter.style.display = 'flex'; 
-      vSum.style.display = 'none'; vCard.style.display = 'block'; vDet.style.display = 'none';
+      vMain.style.display = 'none'; vSum.style.display = 'none'; vCard.style.display = 'block'; vDet.style.display = 'none';
       renderCardGrid();
     } else {
       monthFilter.style.display = 'none';
-      vSum.style.display = 'none'; vCard.style.display = 'none'; vDet.style.display = 'flex';
+      vMain.style.display = 'none'; vSum.style.display = 'none'; vCard.style.display = 'none'; vDet.style.display = 'flex';
       renderSingleClientDetail();
     }
   }
 }
 
-// 공통 차트 렌더 함수
 function renderChart(id, type, dts, opt = {}) {
   if (chartInstances[id]) chartInstances[id].destroy();
   Chart.defaults.font.family = "'Noto Sans KR', sans-serif";
@@ -145,7 +154,6 @@ function renderChart(id, type, dts, opt = {}) {
     options: { responsive: true, maintainAspectRatio: false, layout: { padding: { bottom: 15 } }, plugins: { legend: { position: 'bottom', labels: { padding: 15 } } }, ...opt } 
   });
 }
-
 function calculateStats(data) {
   let res = { revTotal: 0, revTrans: 0, revLease: 0, varC: 0, fixC: 0, cm: 0, gp: 0 };
   data.forEach(d => {
@@ -155,17 +163,99 @@ function calculateStats(data) {
   res.cm = res.revTotal - res.varC; res.gp = res.cm - res.fixC;
   return res;
 }
-
-function applyYoYBadge(elementId, currVal, prevVal) {
+function applyYoYBadge(elementId, currVal, prevVal, prefix = '전년비') {
   const el = document.getElementById(elementId);
-  if (prevVal === 0) { el.innerText = '전년비 -'; el.className = 'yoy-badge yoy-none'; return; }
+  if (prevVal === 0) { el.innerText = `${prefix} -`; el.className = 'yoy-badge yoy-none'; return; }
   const ratio = ((currVal - prevVal) / prevVal) * 100;
-  if (ratio > 0) { el.innerText = `▲ ${ratio.toFixed(1)}%`; el.className = 'yoy-badge yoy-up'; } 
-  else if (ratio < 0) { el.innerText = `▼ ${Math.abs(ratio).toFixed(1)}%`; el.className = 'yoy-badge yoy-down'; } 
-  else { el.innerText = '-'; el.className = 'yoy-badge yoy-none'; }
+  if (ratio > 0) { el.innerText = `${prefix} ▲ ${ratio.toFixed(1)}%`; el.className = 'yoy-badge yoy-up'; } 
+  else if (ratio < 0) { el.innerText = `${prefix} ▼ ${Math.abs(ratio).toFixed(1)}%`; el.className = 'yoy-badge yoy-down'; } 
+  else { el.innerText = `${prefix} -`; el.className = 'yoy-badge yoy-none'; }
 }
 
-// 🌟 1. 아코디언 표가 포함된 본부/팀 리포트 뷰 🌟
+// 🌟 1. 주요 경영 지표 (인사이트 대시보드 - MoM 분석) 🌟
+function renderMainDashboard() {
+  const currYear = parseInt(state.year);
+  let targetMonth = state.month === 'All' ? Math.max(...rawData.filter(d => d.y === currYear).map(d => d.m)) : parseInt(state.month);
+  if(!isFinite(targetMonth)) targetMonth = 1;
+  
+  let prevYear = targetMonth === 1 ? currYear - 1 : currYear;
+  let prevMonth = targetMonth === 1 ? 12 : targetMonth - 1;
+
+  document.getElementById('main-title-text').innerText = `${currYear}년 ${targetMonth}월 경영 인사이트`;
+
+  const tData = rawData.filter(d => d.y === currYear && d.m === targetMonth && (state.hq === 'All' || d.hq === state.hq) && (state.team === 'All' || d.team === state.team));
+  const pData = rawData.filter(d => d.y === prevYear && d.m === prevMonth && (state.hq === 'All' || d.hq === state.hq) && (state.team === 'All' || d.team === state.team));
+
+  const tStats = calculateStats(tData); const pStats = calculateStats(pData);
+
+  document.getElementById('main-kpi-rev').innerText = formatMoney(tStats.revTotal);
+  document.getElementById('main-kpi-cm').innerText = formatMoney(tStats.cm);
+  document.getElementById('main-kpi-cm-rate').innerText = tStats.revTotal === 0 ? '0%' : ((tStats.cm/tStats.revTotal)*100).toFixed(1)+'%';
+  document.getElementById('main-kpi-gp').innerText = formatMoney(tStats.gp);
+  document.getElementById('main-kpi-gp-rate').innerText = tStats.revTotal === 0 ? '0%' : ((tStats.gp/tStats.revTotal)*100).toFixed(1)+'%';
+
+  applyYoYBadge('main-kpi-mom-rev', tStats.revTotal, pStats.revTotal, '전월비');
+  applyYoYBadge('main-kpi-mom-gp', tStats.gp, pStats.gp, '전월비');
+
+  const clientMap = {};
+  tData.forEach(d => {
+    if(!clientMap[d.client]) clientMap[d.client] = { name: d.client, tRev: 0, pRev: 0 };
+    if(d.type === '매출') clientMap[d.client].tRev += d.amt;
+  });
+  pData.forEach(d => {
+    if(!clientMap[d.client]) clientMap[d.client] = { name: d.client, tRev: 0, pRev: 0 };
+    if(d.type === '매출') clientMap[d.client].pRev += d.amt;
+  });
+
+  const clients = Object.values(clientMap);
+  clients.forEach(c => c.revDiff = c.tRev - c.pRev);
+  const revSorted = [...clients].sort((a,b) => b.revDiff - a.revDiff);
+  
+  let bestHTML = '<div class="insight-val" style="color:#888;">데이터 없음</div>';
+  let worstHTML = '<div class="insight-val" style="color:#888;">데이터 없음</div>';
+  
+  if(revSorted.length > 0 && revSorted[0].revDiff > 0) {
+    let c = revSorted[0];
+    bestHTML = `<div class="insight-val">${c.name}</div><div class="insight-desc">전월 대비 매출 ${formatMoney(c.revDiff)}원 상승 (▲${c.pRev===0?'100':((c.revDiff/c.pRev)*100).toFixed(1)}%)</div>`;
+  }
+  if(revSorted.length > 0 && revSorted[revSorted.length-1].revDiff < 0) {
+    let c = revSorted[revSorted.length-1];
+    worstHTML = `<div class="insight-val">${c.name}</div><div class="insight-desc">전월 대비 매출 ${formatMoney(Math.abs(c.revDiff))}원 하락 (▼${c.pRev===0?'100':Math.abs((c.revDiff/c.pRev)*100).toFixed(1)}%)</div>`;
+  }
+  document.getElementById('insight-best').innerHTML = bestHTML;
+  document.getElementById('insight-worst').innerHTML = worstHTML;
+
+  // 차트: 팀별 전월비
+  const teamMap = {};
+  tData.forEach(d => { if(!teamMap[d.team]) teamMap[d.team]={t:0, p:0}; if(d.type==='매출') teamMap[d.team].t += d.amt; });
+  pData.forEach(d => { if(!teamMap[d.team]) teamMap[d.team]={t:0, p:0}; if(d.type==='매출') teamMap[d.team].p += d.amt; });
+  const teamLabels = Object.keys(teamMap);
+  
+  renderChart('main-chart-team', 'bar', {
+    labels: teamLabels,
+    datasets: [
+      { label: `${targetMonth}월 당월 매출`, data: teamLabels.map(t => teamMap[t].t), backgroundColor: '#00A6B2', borderRadius: 4 },
+      { label: `${prevMonth}월 전월 매출`, data: teamLabels.map(t => teamMap[t].p), backgroundColor: '#DEE2E6', borderRadius: 4 }
+    ]
+  });
+
+  // Top/Bottom 실적 테이블
+  const tbody = document.getElementById('main-table-body'); tbody.innerHTML = '';
+  const topBot = revSorted.slice(0, 3).concat(revSorted.slice(-2).reverse()).filter((v,i,a)=>a.indexOf(v)===i);
+  topBot.forEach(c => {
+    if(c.tRev === 0 && c.pRev === 0) return;
+    let ratio = c.pRev === 0 ? 0 : (c.revDiff / c.pRev) * 100;
+    let txt = ratio > 0 ? `▲ ${ratio.toFixed(1)}%` : (ratio < 0 ? `▼ ${Math.abs(ratio).toFixed(1)}%` : '-');
+    let color = ratio > 0 ? '#2E7D32' : (ratio < 0 ? '#C62828' : 'inherit');
+    tbody.innerHTML += `<tr><td class="text-center" style="font-weight:900;">${c.name}</td>
+      <td style="font-weight:700;">${formatMoney(c.tRev)}</td>
+      <td style="color:#6C757D;">${formatMoney(c.pRev)}</td>
+      <td style="color:${color}; font-weight:900;">${txt}</td>
+      <td style="color:${color};">${ratio>0?'+':''}${formatMoney(c.revDiff)}</td></tr>`;
+  });
+}
+
+// 🌟 2. 아코디언 표가 포함된 팀 리포트 뷰 🌟
 function renderSummaryView() {
   const currYear = parseInt(state.year);
   const currData = rawData.filter(d => d.y === currYear && (state.hq === 'All' || d.hq === state.hq) && (state.team === 'All' || d.team === state.team));
@@ -190,7 +280,6 @@ function renderSummaryView() {
     labels: ['매출이익', '변동원가', '고정원가'], datasets: [{ data: [currStats.gp<0?0:currStats.gp, currStats.varC, currStats.fixC], backgroundColor: ['#F39C12', '#2E79B5', '#E9ECEF'], borderWidth: 0 }] 
   });
   
-  // 표 그리기 (아코디언 토글 추가)
   const head = document.getElementById('sum-table-head'); const tbody = document.getElementById('sum-table-body');
   head.innerHTML = `<tr><th>해당 월</th><th>당기 매출</th><th>전년 동기 매출</th><th>증감률</th><th>운송수입</th><th>지입료수입</th><th>변동원가</th><th>공헌이익</th><th>공헌이익률</th><th>고정원가</th><th>매출이익</th><th>매출이익률</th></tr>`;
   tbody.innerHTML = '';
@@ -208,41 +297,31 @@ function renderSummaryView() {
     const cm = cRev - cVar; const cmRatio = cRev === 0 ? 0 : (cm / cRev) * 100;
     const gp = cm - cFix; const gpRatio = cRev === 0 ? 0 : (gp / cRev) * 100;
     
-    // 메인 행 생성 (클릭 시 아코디언 동작)
     const tr = document.createElement('tr'); 
     tr.className = 'clickable-row'; 
     tr.innerHTML = `<td class="text-center" style="font-weight:900;">${m}월 ▾</td><td style="font-weight:900;">${formatMoney(cRev)}</td><td style="color:#6C757D;">${formatMoney(pRev)}</td><td style="color:${yoyColor}; font-weight:900;">${yoyTxt}</td><td>${formatMoney(cTrans)}</td><td>${formatMoney(cLease)}</td><td>${formatMoney(cVar)}</td><td style="color:#00A6B2; font-weight:900;">${formatMoney(cm)}</td><td style="font-size:12px; color:#6C757D;">${cmRatio.toFixed(1)}%</td><td>${formatMoney(cFix)}</td><td style="color:${gp < 0 ? '#DC3545' : '#212529'}; font-weight:900;">${formatMoney(gp)}</td><td style="font-size:12px; color:#6C757D;">${gpRatio.toFixed(1)}%</td>`;
     
-    // 아코디언으로 숨겨질 기존/신규 행 생성
-    const dExist = cData.filter(d => d.isNew !== '신규');
-    const dNew = cData.filter(d => d.isNew === '신규');
+    const dExist = cData.filter(d => d.isNew !== '신규'); const dNew = cData.filter(d => d.isNew === '신규');
     const stE = calculateStats(dExist); const stN = calculateStats(dNew);
 
     const makeSubHtml = (title, st, color) => {
       if(st.revTotal === 0 && st.varC === 0 && st.fixC === 0) return '';
-      const cmRate = st.revTotal===0 ? 0 : (st.cm/st.revTotal)*100;
-      const gpRate = st.revTotal===0 ? 0 : (st.gp/st.revTotal)*100;
+      const cmRate = st.revTotal===0 ? 0 : (st.cm/st.revTotal)*100; const gpRate = st.revTotal===0 ? 0 : (st.gp/st.revTotal)*100;
       return `<td class="text-center" style="color:${color};">└ ${title}</td><td style="font-weight:700;">${formatMoney(st.revTotal)}</td><td>-</td><td>-</td><td>${formatMoney(st.revTrans)}</td><td>${formatMoney(st.revLease)}</td><td>${formatMoney(st.varC)}</td><td style="color:#00A6B2;">${formatMoney(st.cm)}</td><td style="font-size:12px;">${cmRate.toFixed(1)}%</td><td>${formatMoney(st.fixC)}</td><td style="color:${st.gp < 0 ? '#DC3545' : '#212529'};">${formatMoney(st.gp)}</td><td style="font-size:12px;">${gpRate.toFixed(1)}%</td>`;
     }
 
     const subTr1 = document.createElement('tr'); subTr1.className = `sub-row sub-${m}`; subTr1.innerHTML = makeSubHtml('기존 사업', stE, '#2E7D32');
     const subTr2 = document.createElement('tr'); subTr2.className = `sub-row sub-${m}`; subTr2.innerHTML = makeSubHtml('신규 사업', stN, '#C62828');
 
-    // 클릭 이벤트 바인딩
     tr.onclick = () => {
-      const subRows = document.querySelectorAll(`.sub-${m}`);
-      subRows.forEach(sr => {
-        if(sr.innerHTML !== '') sr.classList.toggle('active');
-      });
+      document.querySelectorAll(`.sub-${m}`).forEach(sr => { if(sr.innerHTML !== '') sr.classList.toggle('active'); });
     };
 
-    tbody.appendChild(tr);
-    tbody.appendChild(subTr1);
-    tbody.appendChild(subTr2);
+    tbody.appendChild(tr); tbody.appendChild(subTr1); tbody.appendChild(subTr2);
   }
 }
 
-// --- 뷰 2 (카드 뷰) ---
+// 🌟 3. 화주사별 카드 뷰
 function renderCardGrid() {
   const currYear = parseInt(state.year);
   const currData = rawData.filter(d => d.y === currYear && (state.month === 'All' || String(d.m) === state.month) && (state.hq === 'All' || d.hq === state.hq) && (state.team === 'All' || d.team === state.team));
@@ -286,7 +365,7 @@ function renderCardGrid() {
   buildCards(sumExist, 'card-container-exist'); buildCards(sumNew, 'card-container-new');
 }
 
-// --- 뷰 3 (단일 화주사 상세) ---
+// 🌟 4. 특정 화주사 상세 분석 뷰 🌟
 function renderSingleClientDetail() {
   const currYear = parseInt(state.year);
   const clientName = state.clientView;
