@@ -61,6 +61,7 @@ body { background-color: var(--bg-color); color: var(--text-main); font-size: 13
 .yoy-none { background-color: #F8F9FA; color: #6C757D; }
 
 .chart-layout { display: grid; grid-template-columns: 2.5fr 1fr; gap: 20px; }
+#view-detail .chart-layout { grid-template-columns: 1fr 1fr; }
 .chart-box { background: var(--card-bg); padding: 25px; border-radius: 12px; border: 1px solid var(--border-color); box-shadow: 0 4px 10px rgba(0,0,0,0.03); }
 .large-chart, .small-chart { height: 420px; display: flex; flex-direction: column; } 
 .canvas-wrap { position: relative; flex: 1; width: 100%; min-height: 0; } 
@@ -69,15 +70,22 @@ body { background-color: var(--bg-color); color: var(--text-main); font-size: 13
 .box-header .subtitle { font-size: 12px; color: var(--text-muted); font-weight: 500; }
 canvas { width: 100% !important; height: 100% !important; }
 
+/* 표 디자인 */
 .table-container { background: var(--card-bg); padding: 25px; border-radius: 12px; border: 1px solid var(--border-color); box-shadow: 0 4px 10px rgba(0,0,0,0.03); }
 .table-scroll { overflow-x: auto; margin-top: 10px; }
 .data-table { width: 100%; border-collapse: collapse; text-align: right; min-width: 1100px; }
 .data-table th, .data-table td { padding: 14px 12px; border-bottom: 1px solid var(--border-color); font-size: 13px; white-space: nowrap; }
 .data-table th { background: #F8F9FA; font-weight: 900; color: #495057; text-align: center; }
 .data-table td.text-center { text-align: center; font-weight: 700; color: #495057; }
-/* ★ 표 클릭 유도 효과 */
-.clickable-row { cursor: pointer; transition: 0.2s; }
+
+/* ★ 메인 행 클릭 효과 및 아코디언 관련 스타일 */
+.clickable-row { cursor: pointer; transition: 0.2s; position: relative; }
 .clickable-row:hover { background-color: #F1F8FF; }
+/* 아코디언으로 열리는 서브 행 스타일 */
+.sub-row { background-color: #F8F9FA; display: none; }
+.sub-row td { border-bottom: 1px dashed #DEE2E6; font-size: 12px; color: #555; }
+.sub-row.active { display: table-row; animation: fadeIn 0.3s ease-in-out; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
 
 .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; }
 .client-card { background: var(--card-bg); border-radius: 12px; padding: 22px; box-shadow: 0 4px 10px rgba(0,0,0,0.03); border: 1px solid var(--border-color); cursor: pointer; transition: 0.2s; }
@@ -90,10 +98,3 @@ canvas { width: 100% !important; height: 100% !important; }
 .card-row.highlight { color: var(--accent-cyan); font-weight: 900; }
 .card-row.highlight .val { color: var(--accent-cyan); font-size: 14px; }
 .txt-red { color: #DC3545 !important; }
-
-/* 모달 팝업용 CSS */
-.modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
-.modal-content { background: #FFF; width: 90%; max-width: 1000px; max-height: 80vh; border-radius: 12px; padding: 30px; overflow-y: auto; position: relative; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
-.close-btn { position: absolute; top: 20px; right: 25px; font-size: 30px; cursor: pointer; color: #555; font-weight: bold; }
-.modal-header h2 { font-size: 22px; font-weight: 900; color: var(--text-main); }
-.modal-subtitle { font-size: 14px; font-weight: bold; color: var(--accent-cyan); display: block; margin-top: 5px; }
