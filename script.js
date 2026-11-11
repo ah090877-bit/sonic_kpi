@@ -1,9 +1,8 @@
-// ★ 반드시 새 배포로 발급받은 URL을 붙여넣으세요!
+// ★ 반드시 최신 발급받은 URL을 붙여넣으세요!
 const API_URL = 'https://script.google.com/macros/s/AKfycbxoRToFFWcjmzjxxYkvPHourAy9C3FxTBWzoASIgiKBWkyofecavJCVyCo8hRy306gq/exec';
 
 let rawData = [];
 let chartInstances = {};
-// view 기본을 'main' (인사이트 대시보드)으로 세팅
 const state = { view: 'main', year: 'All', month: 'All', hq: 'All', team: 'All', clientView: 'All' };
 const formatMoney = (val) => val.toLocaleString('ko-KR');
 
@@ -44,7 +43,6 @@ function initApp(response) {
   if (!response.success) { alert("데이터 로드 오류"); return; }
   let fetchedData = response.data.filter(d => d.client !== '화주공통비');
   
-  // 조직 이동 최신본 자동 업데이트
   const latestOrgMap = {};
   fetchedData.sort((a, b) => (a.y !== b.y ? a.y - b.y : a.m - b.m)).forEach(d => {
     latestOrgMap[d.client] = { hq: d.hq, team: d.team };
@@ -59,7 +57,7 @@ function initApp(response) {
   if(years.length > 0) {
     state.year = years[0].toString();
     const maxMonth = Math.max(...rawData.filter(d => d.y === years[0]).map(d => d.m));
-    state.month = maxMonth.toString(); // 최신 월 기본 세팅
+    state.month = maxMonth.toString(); 
   }
   
   setupSidebar(); buildTopFilters(); updateDashboard();
@@ -88,7 +86,6 @@ function buildTopFilters() {
     return true;
   });
   
-  // 필터 유지 핵심 방어코드 적용
   populateSelect('f-year', [...new Set(filterDataFor('year').map(d => d.y))].sort((a,b)=>b-a), state.year, false);
   populateSelect('f-month', [...new Set(filterDataFor('month').map(d => d.m))].sort((a,b)=>a-b), state.month, true);
   populateSelect('f-hq', [...new Set(filterDataFor('hq').map(d => d.hq))].sort(), state.hq, true);
@@ -99,7 +96,6 @@ function populateSelect(id, options, selected, addAll) {
   const el = document.getElementById(id); const key = id.replace('f-', '');
   let currentVal = state[key]; 
   
-  // 내가 선택했던 팀/본부가 새로운 조건(options) 안에도 존재한다면, '전체'로 튕기지 않고 그대로 유지함!
   if (currentVal !== 'All' && !options.includes(currentVal) && !options.includes(Number(currentVal))) {
     currentVal = addAll ? 'All' : (options.length > 0 ? options[0] : ''); 
     state[key] = currentVal; 
@@ -129,7 +125,6 @@ function updateDashboard() {
     vMain.style.display = 'flex'; vSum.style.display = 'none'; vCard.style.display = 'none'; vDet.style.display = 'none';
     renderMainDashboard();
   } else if (state.view === 'team') {
-    // 팀별 연간 뷰에서는 월 필터 자동 숨김
     monthFilter.style.display = 'none';
     vMain.style.display = 'none'; vSum.style.display = 'flex'; vCard.style.display = 'none'; vDet.style.display = 'none';
     renderSummaryView();
@@ -154,6 +149,7 @@ function renderChart(id, type, dts, opt = {}) {
     options: { responsive: true, maintainAspectRatio: false, layout: { padding: { bottom: 15 } }, plugins: { legend: { position: 'bottom', labels: { padding: 15 } } }, ...opt } 
   });
 }
+
 function calculateStats(data) {
   let res = { revTotal: 0, revTrans: 0, revLease: 0, varC: 0, fixC: 0, cm: 0, gp: 0 };
   data.forEach(d => {
@@ -197,61 +193,103 @@ function renderMainDashboard() {
   applyYoYBadge('main-kpi-mom-rev', tStats.revTotal, pStats.revTotal, '전월비');
   applyYoYBadge('main-kpi-mom-gp', tStats.gp, pStats.gp, '전월비');
 
+  // 데이터 집계
   const clientMap = {};
   tData.forEach(d => {
-    if(!clientMap[d.client]) clientMap[d.client] = { name: d.client, tRev: 0, pRev: 0 };
+    if(!clientMap[d.client]) clientMap[d.client] = { name: d.client, tRev: 0, pRev: 0, tVar: 0, pVar: 0, tFix: 0, pFix: 0 };
     if(d.type === '매출') clientMap[d.client].tRev += d.amt;
+    else if(d.type === '변동원가') clientMap[d.client].tVar += d.amt;
+    else if(d.type === '고정원가') clientMap[d.client].tFix += d.amt;
   });
   pData.forEach(d => {
-    if(!clientMap[d.client]) clientMap[d.client] = { name: d.client, tRev: 0, pRev: 0 };
+    if(!clientMap[d.client]) clientMap[d.client] = { name: d.client, tRev: 0, pRev: 0, tVar: 0, pVar: 0, tFix: 0, pFix: 0 };
     if(d.type === '매출') clientMap[d.client].pRev += d.amt;
+    else if(d.type === '변동원가') clientMap[d.client].pVar += d.amt;
+    else if(d.type === '고정원가') clientMap[d.client].pFix += d.amt;
   });
 
   const clients = Object.values(clientMap);
-  clients.forEach(c => c.revDiff = c.tRev - c.pRev);
+  clients.forEach(c => {
+    c.revDiff = c.tRev - c.pRev;
+    c.tGp = c.tRev - c.tVar - c.tFix;
+    c.pGp = c.pRev - c.pVar - c.pFix;
+    c.gpDiff = c.tGp - c.pGp;
+  });
+  
   const revSorted = [...clients].sort((a,b) => b.revDiff - a.revDiff);
+  const gpSorted = [...clients].sort((a,b) => b.gpDiff - a.gpDiff);
   
   let bestHTML = '<div class="insight-val" style="color:#888;">데이터 없음</div>';
   let worstHTML = '<div class="insight-val" style="color:#888;">데이터 없음</div>';
   
   if(revSorted.length > 0 && revSorted[0].revDiff > 0) {
     let c = revSorted[0];
-    bestHTML = `<div class="insight-val">${c.name}</div><div class="insight-desc">전월 대비 매출 ${formatMoney(c.revDiff)}원 상승 (▲${c.pRev===0?'100':((c.revDiff/c.pRev)*100).toFixed(1)}%)</div>`;
+    bestHTML = `<div class="insight-val">${c.name}</div><div class="insight-desc">전월 대비 매출액 ${formatMoney(c.revDiff)}원 상승 (▲${c.pRev===0?'100':((c.revDiff/c.pRev)*100).toFixed(1)}%)</div>`;
   }
   if(revSorted.length > 0 && revSorted[revSorted.length-1].revDiff < 0) {
     let c = revSorted[revSorted.length-1];
-    worstHTML = `<div class="insight-val">${c.name}</div><div class="insight-desc">전월 대비 매출 ${formatMoney(Math.abs(c.revDiff))}원 하락 (▼${c.pRev===0?'100':Math.abs((c.revDiff/c.pRev)*100).toFixed(1)}%)</div>`;
+    worstHTML = `<div class="insight-val">${c.name}</div><div class="insight-desc">전월 대비 매출액 ${formatMoney(Math.abs(c.revDiff))}원 하락 (▼${c.pRev===0?'100':Math.abs((c.revDiff/c.pRev)*100).toFixed(1)}%)</div>`;
   }
   document.getElementById('insight-best').innerHTML = bestHTML;
   document.getElementById('insight-worst').innerHTML = worstHTML;
 
-  // 차트: 팀별 전월비
+  // 팀별 차트 집계
   const teamMap = {};
-  tData.forEach(d => { if(!teamMap[d.team]) teamMap[d.team]={t:0, p:0}; if(d.type==='매출') teamMap[d.team].t += d.amt; });
-  pData.forEach(d => { if(!teamMap[d.team]) teamMap[d.team]={t:0, p:0}; if(d.type==='매출') teamMap[d.team].p += d.amt; });
+  tData.forEach(d => { 
+    if(!teamMap[d.team]) teamMap[d.team]={ tRev:0, pRev:0, tVar:0, pVar:0, tFix:0, pFix:0 }; 
+    if(d.type==='매출') teamMap[d.team].tRev += d.amt; 
+    else if(d.type==='변동원가') teamMap[d.team].tVar += d.amt; 
+    else if(d.type==='고정원가') teamMap[d.team].tFix += d.amt; 
+  });
+  pData.forEach(d => { 
+    if(!teamMap[d.team]) teamMap[d.team]={ tRev:0, pRev:0, tVar:0, pVar:0, tFix:0, pFix:0 }; 
+    if(d.type==='매출') teamMap[d.team].pRev += d.amt; 
+    else if(d.type==='변동원가') teamMap[d.team].pVar += d.amt; 
+    else if(d.type==='고정원가') teamMap[d.team].pFix += d.amt; 
+  });
   const teamLabels = Object.keys(teamMap);
   
-  renderChart('main-chart-team', 'bar', {
+  // ★ 차트 순서: 과거(전월)가 왼쪽, 현재(당월)가 오른쪽
+  renderChart('main-chart-team-rev', 'bar', {
     labels: teamLabels,
     datasets: [
-      { label: `${targetMonth}월 당월 매출`, data: teamLabels.map(t => teamMap[t].t), backgroundColor: '#00A6B2', borderRadius: 4 },
-      { label: `${prevMonth}월 전월 매출`, data: teamLabels.map(t => teamMap[t].p), backgroundColor: '#DEE2E6', borderRadius: 4 }
+      { label: `${prevMonth}월 전월 매출`, data: teamLabels.map(t => teamMap[t].pRev), backgroundColor: '#DEE2E6', borderRadius: 4 },
+      { label: `${targetMonth}월 당월 매출`, data: teamLabels.map(t => teamMap[t].tRev), backgroundColor: '#00A6B2', borderRadius: 4 }
     ]
   });
 
-  // Top/Bottom 실적 테이블
-  const tbody = document.getElementById('main-table-body'); tbody.innerHTML = '';
-  const topBot = revSorted.slice(0, 3).concat(revSorted.slice(-2).reverse()).filter((v,i,a)=>a.indexOf(v)===i);
-  topBot.forEach(c => {
+  renderChart('main-chart-team-gp', 'bar', {
+    labels: teamLabels,
+    datasets: [
+      { label: `${prevMonth}월 전월 매출이익`, data: teamLabels.map(t => (teamMap[t].pRev - teamMap[t].pVar - teamMap[t].pFix)), backgroundColor: '#F8D7DA', borderRadius: 4 },
+      { label: `${targetMonth}월 당월 매출이익`, data: teamLabels.map(t => (teamMap[t].tRev - teamMap[t].tVar - teamMap[t].tFix)), backgroundColor: '#F39C12', borderRadius: 4 }
+    ]
+  });
+
+  // Top 5 매출 테이블
+  const revBody = document.getElementById('main-table-body-rev'); revBody.innerHTML = '';
+  const topBotRev = revSorted.slice(0, 3).concat(revSorted.slice(-2).reverse()).filter((v,i,a)=>a.indexOf(v)===i);
+  topBotRev.forEach(c => {
     if(c.tRev === 0 && c.pRev === 0) return;
     let ratio = c.pRev === 0 ? 0 : (c.revDiff / c.pRev) * 100;
     let txt = ratio > 0 ? `▲ ${ratio.toFixed(1)}%` : (ratio < 0 ? `▼ ${Math.abs(ratio).toFixed(1)}%` : '-');
     let color = ratio > 0 ? '#2E7D32' : (ratio < 0 ? '#C62828' : 'inherit');
-    tbody.innerHTML += `<tr><td class="text-center" style="font-weight:900;">${c.name}</td>
-      <td style="font-weight:700;">${formatMoney(c.tRev)}</td>
-      <td style="color:#6C757D;">${formatMoney(c.pRev)}</td>
-      <td style="color:${color}; font-weight:900;">${txt}</td>
-      <td style="color:${color};">${ratio>0?'+':''}${formatMoney(c.revDiff)}</td></tr>`;
+    revBody.innerHTML += `<tr><td class="text-center" style="font-weight:900;">${c.name}</td>
+      <td style="font-weight:700;">${formatMoney(c.tRev)}</td><td style="color:#6C757D;">${formatMoney(c.pRev)}</td>
+      <td style="color:${color}; font-weight:900;">${txt}</td><td style="color:${color};">${ratio>0?'+':''}${formatMoney(c.revDiff)}</td></tr>`;
+  });
+
+  // Top 5 매출이익 테이블
+  const gpBody = document.getElementById('main-table-body-gp'); gpBody.innerHTML = '';
+  const topBotGp = gpSorted.slice(0, 3).concat(gpSorted.slice(-2).reverse()).filter((v,i,a)=>a.indexOf(v)===i);
+  topBotGp.forEach(c => {
+    if(c.tGp === 0 && c.pGp === 0) return;
+    let ratio = c.pGp === 0 ? 0 : (c.gpDiff / c.pGp) * 100;
+    let txt = ratio > 0 ? `▲ ${ratio.toFixed(1)}%` : (ratio < 0 ? `▼ ${Math.abs(ratio).toFixed(1)}%` : '-');
+    let color = ratio > 0 ? '#2E7D32' : (ratio < 0 ? '#C62828' : 'inherit');
+    gpBody.innerHTML += `<tr><td class="text-center" style="font-weight:900;">${c.name}</td>
+      <td style="font-weight:700;">${formatMoney(c.tGp)}</td><td style="color:#6C757D;">${formatMoney(c.pGp)}</td>
+      <td style="color:${color}; font-weight:900;">${txt}</td><td style="color:${color};">${ratio>0?'+':''}${formatMoney(c.gpDiff)}</td></tr>`;
   });
 }
 
@@ -324,7 +362,10 @@ function renderSummaryView() {
 // 🌟 3. 화주사별 카드 뷰
 function renderCardGrid() {
   const currYear = parseInt(state.year);
-  const currData = rawData.filter(d => d.y === currYear && (state.month === 'All' || String(d.m) === state.month) && (state.hq === 'All' || d.hq === state.hq) && (state.team === 'All' || d.team === state.team));
+  let targetMonth = state.month === 'All' ? Math.max(...rawData.filter(d => d.y === currYear).map(d => d.m)) : parseInt(state.month);
+  if(!isFinite(targetMonth)) targetMonth = 1;
+
+  const currData = rawData.filter(d => d.y === currYear && d.m === targetMonth && (state.hq === 'All' || d.hq === state.hq) && (state.team === 'All' || d.team === state.team));
   
   const sumExist = {}, sumNew = {};
   currData.forEach(d => {
@@ -410,16 +451,16 @@ function renderSingleClientDetail() {
 
   renderChart('det-chart-yoy', 'bar', {
     labels: ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'],
-    datasets: [{ label: `${currYear}년 매출`, data: m1Rev, backgroundColor: '#4A90E2', borderRadius: 4 }, { label: `${currYear-1}년 매출`, data: m2Rev, backgroundColor: '#DEE2E6', borderRadius: 4 }]
+    datasets: [{ label: `${currYear}년 매출`, data: m1Rev, backgroundColor: '#00A6B2', borderRadius: 4 }, { label: `${currYear-1}년 매출`, data: m2Rev, backgroundColor: '#DEE2E6', borderRadius: 4 }]
   });
 
   renderChart('det-chart-margin', 'line', {
     labels: ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'],
     datasets: [
-      { label: `${currYear} 공헌이익률`, data: chart1CM, realData: real1CM, borderColor: '#00A6B2', tension: 0.3, borderWidth: 3, spanGaps: true },
-      { label: `${currYear} 매출이익률`, data: chart1GP, realData: real1GP, borderColor: '#F39C12', tension: 0.3, borderWidth: 3, spanGaps: true },
-      { label: `${currYear-1} 공헌이익률`, data: chart2CM, realData: real2CM, borderColor: '#B0BEC5', tension: 0.3, borderDash: [5,5], borderWidth: 2, spanGaps: true },
-      { label: `${currYear-1} 매출이익률`, data: chart2GP, realData: real2GP, borderColor: '#E8A37E', tension: 0.3, borderDash: [5,5], borderWidth: 2, spanGaps: true }
+      { label: `${currYear} 공헌이익률(%)`, data: chart1CM, realData: real1CM, borderColor: '#00A6B2', tension: 0.3, borderWidth: 3, spanGaps: true },
+      { label: `${currYear} 매출이익률(%)`, data: chart1GP, realData: real1GP, borderColor: '#F39C12', tension: 0.3, borderWidth: 3, spanGaps: true },
+      { label: `${currYear-1} 공헌이익률(%)`, data: chart2CM, realData: real2CM, borderColor: '#B0BEC5', tension: 0.3, borderDash: [5,5], borderWidth: 2, spanGaps: true },
+      { label: `${currYear-1} 매출이익률(%)`, data: chart2GP, realData: real2GP, borderColor: '#E8A37E', tension: 0.3, borderDash: [5,5], borderWidth: 2, spanGaps: true }
     ]
   }, {
     scales: { y: { suggestedMin: -20, suggestedMax: 20, ticks: { stepSize: 5, callback: v => v + '%' } } },
@@ -459,3 +500,4 @@ function renderSingleClientDetail() {
 }
 
 function goBackToCards() { state.clientView = 'All'; updateDashboard(); }
+window.onload = fetchData;
