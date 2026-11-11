@@ -14,13 +14,13 @@ function login() {
   
   errBox.style.display = 'none';
   document.getElementById('login-container').style.display = 'none';
-  document.getElementById('loader').style.display = 'flex';
+  
+  fetchData(); // 로그인 성공 시에도 새로고침(로딩) 화면 띄움
   
   fetch(`${API_URL}?action=login&id=${id}&pw=${pw}`)
     .then(res => res.json())
     .then(res => {
-      if(res.success) { fetchData(); } 
-      else {
+      if(!res.success) {
         document.getElementById('loader').style.display = 'none';
         document.getElementById('login-container').style.display = 'flex';
         errBox.style.display = 'block'; errBox.innerText = '아이디 또는 비밀번호가 일치하지 않습니다.';
@@ -34,8 +34,20 @@ function login() {
 }
 
 function fetchData() {
-  document.getElementById('loader-text').innerText = '데이터 동기화 중...';
-  fetch(API_URL).then(res => res.json()).then(data => initApp(data)).catch(err => alert("데이터 오류: " + err));
+  // ★ 새로고침 먹통 방지: 데이터 요청 시 즉각적으로 로딩창을 띄우고 메인 화면을 숨깁니다.
+  const loader = document.getElementById('loader');
+  const app = document.getElementById('app');
+  
+  loader.style.display = 'flex';
+  document.getElementById('loader-text').innerText = '최신 경영 실적을 동기화 중입니다...';
+  app.style.display = 'none';
+  
+  fetch(API_URL)
+    .then(res => res.json())
+    .then(data => initApp(data))
+    .catch(err => {
+      loader.innerHTML = `<div style="background:#FFF1F0; padding:30px; border-radius:10px;"><h3 style="color:#CF1322;">🚨 연결 실패</h3><p>${err}</p></div>`;
+    });
 }
 
 function initApp(response) {
@@ -60,6 +72,8 @@ function initApp(response) {
   }
   
   setupSidebar(); buildTopFilters(); updateDashboard();
+  
+  // 데이터 로드가 완벽히 끝난 후 로딩창을 없애고 화면을 보여줌
   document.getElementById('loader').style.display = 'none'; 
   document.getElementById('app').style.display = 'flex';
 }
@@ -77,15 +91,19 @@ function setupSidebar() {
 }
 
 function buildTopFilters() {
+  // ★ 연도 인식 불가 패치: 연도 필터는 월/팀 필터의 제약을 무시하고 데이터에 존재하는 모든 연도를 고정 출력합니다.
+  const allYears = [...new Set(rawData.map(d => d.y))].sort((a,b)=>b-a);
+  populateSelect('f-year', allYears, state.year, false);
+  
+  // 나머지(월, 본부, 팀)는 선택된 연도 안에서만 상호 작용하도록 유지
   const filterDataFor = (skipKey) => rawData.filter(d => {
-    if (skipKey !== 'year' && state.year !== 'All' && String(d.y) !== state.year) return false;
+    if (String(d.y) !== state.year) return false;
     if (skipKey !== 'month' && state.month !== 'All' && String(d.m) !== state.month) return false;
     if (skipKey !== 'hq' && state.hq !== 'All' && d.hq !== state.hq) return false;
     if (skipKey !== 'team' && state.team !== 'All' && d.team !== state.team) return false;
     return true;
   });
   
-  populateSelect('f-year', [...new Set(filterDataFor('year').map(d => d.y))].sort((a,b)=>b-a), state.year, false);
   populateSelect('f-month', [...new Set(filterDataFor('month').map(d => d.m))].sort((a,b)=>a-b), state.month, true);
   populateSelect('f-hq', [...new Set(filterDataFor('hq').map(d => d.hq))].sort(), state.hq, true);
   populateSelect('f-team', [...new Set(filterDataFor('team').map(d => d.team))].sort(), state.team, true);
@@ -95,8 +113,9 @@ function populateSelect(id, options, selected, addAll) {
   const el = document.getElementById(id); const key = id.replace('f-', '');
   let currentVal = state[key]; 
   
-  if (currentVal !== 'All' && !options.includes(currentVal) && !options.includes(Number(currentVal))) {
-    currentVal = addAll ? 'All' : (options.length > 0 ? options[0] : ''); 
+  const strOptions = options.map(String);
+  if (currentVal !== 'All' && !strOptions.includes(String(currentVal))) {
+    currentVal = addAll ? 'All' : (options.length > 0 ? String(options[0]) : ''); 
     state[key] = currentVal; 
   }
   
@@ -157,13 +176,10 @@ function calculateStats(data) {
   res.cm = res.revTotal - res.varC; res.gp = res.cm - res.fixC;
   return res;
 }
-
-// ★ 증감률 오류 해결: 분모를 절댓값으로 처리
 function getRatio(curr, prev) {
   if (prev === 0) return null;
   return ((curr - prev) / Math.abs(prev)) * 100;
 }
-
 function applyYoYBadge(elementId, currVal, prevVal, prefix = '전년비') {
   const el = document.getElementById(elementId);
   if (prevVal === 0) { el.innerText = `${prefix} -`; el.className = 'yoy-badge yoy-none'; return; }
@@ -173,7 +189,7 @@ function applyYoYBadge(elementId, currVal, prevVal, prefix = '전년비') {
   else { el.innerText = `${prefix} -`; el.className = 'yoy-badge yoy-none'; }
 }
 
-// 🌟 1. 주요 경영 지표 (인사이트 대시보드 - MoM 분석) 🌟
+// 🌟 1. 주요 경영 지표 (인사이트)
 function renderMainDashboard() {
   const currYear = parseInt(state.year);
   let targetMonth = state.month === 'All' ? Math.max(...rawData.filter(d => d.y === currYear).map(d => d.m)) : parseInt(state.month);
@@ -268,7 +284,6 @@ function renderMainDashboard() {
     ]
   });
 
-  // ★ 표의 열 순서 변경: 전월(pRev) -> 기준월(tRev)
   const revBody = document.getElementById('main-table-body-rev'); revBody.innerHTML = '';
   const topBotRev = revSorted.slice(0, 3).concat(revSorted.slice(-2).reverse()).filter((v,i,a)=>a.indexOf(v)===i);
   topBotRev.forEach(c => {
@@ -298,7 +313,7 @@ function renderMainDashboard() {
   });
 }
 
-// 🌟 2. 팀 리포트 뷰 🌟
+// 🌟 2. 아코디언 표가 포함된 팀 리포트 🌟
 function renderSummaryView() {
   const currYear = parseInt(state.year);
   const currData = rawData.filter(d => d.y === currYear && (state.hq === 'All' || d.hq === state.hq) && (state.team === 'All' || d.team === state.team));
@@ -343,7 +358,7 @@ function renderSummaryView() {
     
     const tr = document.createElement('tr'); 
     tr.className = 'clickable-row'; 
-    tr.innerHTML = `<td class="text-center" style="font-weight:900;">${m}월 ▾</td><td style="font-weight:900;">${formatMoney(cRev)}</td><td style="color:#6C757D;">${formatMoney(pRev)}</td><td style="color:${yoyColor}; font-weight:900;">${yoyTxt}</td><td>${formatMoney(cTrans)}</td><td>${formatMoney(cLease)}</td><td>${formatMoney(cVar)}</td><td style="color:#00A6B2; font-weight:900;">${formatMoney(cm)}</td><td style="font-size:12px; color:#6C757D;">${cmRatio.toFixed(1)}%</td><td>${formatMoney(cFix)}</td><td style="color:${gp < 0 ? '#DC3545' : '#212529'}; font-weight:900;">${formatMoney(gp)}</td><td style="font-size:12px; color:#6C757D;">${gpRatio.toFixed(1)}%</td>`;
+    tr.innerHTML = `<td class="text-center" style="font-weight:900; color:#4A90E2;">${m}월 ▾</td><td style="font-weight:900;">${formatMoney(cRev)}</td><td style="color:#6C757D;">${formatMoney(pRev)}</td><td style="color:${yoyColor}; font-weight:900;">${yoyTxt}</td><td>${formatMoney(cTrans)}</td><td>${formatMoney(cLease)}</td><td>${formatMoney(cVar)}</td><td style="color:#00A6B2; font-weight:900;">${formatMoney(cm)}</td><td style="font-size:12px; color:#6C757D;">${cmRatio.toFixed(1)}%</td><td>${formatMoney(cFix)}</td><td style="color:${gp < 0 ? '#DC3545' : '#212529'}; font-weight:900;">${formatMoney(gp)}</td><td style="font-size:12px; color:#6C757D;">${gpRatio.toFixed(1)}%</td>`;
     
     const dExist = cData.filter(d => d.isNew !== '신규'); const dNew = cData.filter(d => d.isNew === '신규');
     const stE = calculateStats(dExist); const stN = calculateStats(dNew);
@@ -365,7 +380,7 @@ function renderSummaryView() {
   }
 }
 
-// 🌟 3. 화주사별 카드 뷰
+// 🌟 3. 화주사 카드 뷰
 function renderCardGrid() {
   const currYear = parseInt(state.year);
   let targetMonth = state.month === 'All' ? Math.max(...rawData.filter(d => d.y === currYear).map(d => d.m)) : parseInt(state.month);
@@ -412,7 +427,7 @@ function renderCardGrid() {
   buildCards(sumExist, 'card-container-exist'); buildCards(sumNew, 'card-container-new');
 }
 
-// 🌟 4. 특정 화주사 상세 분석 뷰 🌟
+// 🌟 4. 특정 화주사 단일 분석
 function renderSingleClientDetail() {
   const currYear = parseInt(state.year);
   const clientName = state.clientView;
@@ -455,7 +470,6 @@ function renderSingleClientDetail() {
     chart2CM[i] = capVal(real2CM[i]); chart2GP[i] = capVal(real2GP[i]);
   }
 
-  // ★ 과거(전월)가 왼쪽, 현재(당월)가 오른쪽
   renderChart('det-chart-yoy', 'bar', {
     labels: ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'],
     datasets: [{ label: `${currYear-1}년 매출`, data: m2Rev, backgroundColor: '#DEE2E6', borderRadius: 4 }, { label: `${currYear}년 매출`, data: m1Rev, backgroundColor: '#00A6B2', borderRadius: 4 }]
