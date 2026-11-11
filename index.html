@@ -76,19 +76,21 @@
             <div class="table-container" style="height:420px; overflow-y:auto; margin:0;">
               <div class="box-header"><h4>매출액 실적 급변 화주사 Top 5 (전월비)</h4></div>
               <table class="data-table" style="min-width: 100%;">
-                <thead><tr><th>화주사명</th><th>기준월 매출</th><th>전월 매출</th><th>증감률</th><th>증감액</th></tr></thead>
+                <!-- ★ 헤더 순서 변경 (전월 -> 당월) -->
+                <thead><tr><th>화주사명</th><th>전월 매출</th><th>기준월 매출</th><th>증감률</th><th>증감액</th></tr></thead>
                 <tbody id="main-table-body-rev"></tbody>
               </table>
             </div>
           </div>
           
-          <!-- 2. 매출이익 기준 분석 (추가됨) -->
+          <!-- 2. 매출이익 기준 분석 -->
           <div class="chart-layout" style="grid-template-columns: 1fr 1fr;">
             <div class="chart-box large-chart"><div class="box-header"><h4>팀별 매출이익 전월 비교</h4></div><div class="canvas-wrap"><canvas id="main-chart-team-gp"></canvas></div></div>
             <div class="table-container" style="height:420px; overflow-y:auto; margin:0;">
               <div class="box-header"><h4>매출이익 실적 급변 화주사 Top 5 (전월비)</h4></div>
               <table class="data-table" style="min-width: 100%;">
-                <thead><tr><th>화주사명</th><th>기준월 매출이익</th><th>전월 매출이익</th><th>증감률</th><th>증감액</th></tr></thead>
+                <!-- ★ 헤더 순서 변경 (전월 -> 당월) -->
+                <thead><tr><th>화주사명</th><th>전월 매출이익</th><th>기준월 매출이익</th><th>증감률</th><th>증감액</th></tr></thead>
                 <tbody id="main-table-body-gp"></tbody>
               </table>
             </div>
@@ -203,6 +205,6 @@
     </div>
   </div>
 
-  <script src="script.js?v=23" defer></script>
+  <script src="script.js?v=25" defer></script>
 </body>
 </html>
