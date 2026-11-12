@@ -49,14 +49,14 @@
 
       <div class="scroll-area">
         
-        <!-- 🌟 1. 주요 경영 지표 (인사이트 뷰 - 파스텔톤 적용) -->
+        <!-- 🌟 1. 주요 경영 지표 (인사이트 뷰) -->
         <div id="view-main" style="display: none; flex-direction: column; gap: 20px;">
           <div class="box-header"><h4 id="main-title-text">경영 인사이트</h4><span class="subtitle">선택한 기준월의 전월 대비(MoM) 실적 요약 및 특이사항입니다.</span></div>
           
           <div class="kpi-grid">
-            <div class="kpi-card" style="border-top-color: #A0C4FF;"><h3>기준월 총 매출액</h3><p id="main-kpi-rev">-</p><div class="yoy-badge" id="main-kpi-mom-rev">-</div></div>
-            <div class="kpi-card" style="border-top-color: #BDB2FF;"><h3>기준월 공헌이익</h3><p id="main-kpi-cm">-</p><div class="sub-kpi">이익률: <b id="main-kpi-cm-rate">-</b></div></div>
-            <div class="kpi-card" style="border-top-color: #FFADAD;"><h3>기준월 매출이익</h3><p id="main-kpi-gp">-</p><div class="yoy-badge" id="main-kpi-mom-gp" style="margin-top: 5px;">-</div><div class="sub-kpi">이익률: <b id="main-kpi-gp-rate">-</b></div></div>
+            <div class="kpi-card" style="border-top-color: #2E79B5;"><h3>기준월 총 매출액</h3><p id="main-kpi-rev">-</p><div class="yoy-badge" id="main-kpi-mom-rev">-</div></div>
+            <div class="kpi-card" style="border-top-color: #00A6B2;"><h3>기준월 공헌이익</h3><p id="main-kpi-cm">-</p><div class="sub-kpi">이익률: <b id="main-kpi-cm-rate">-</b></div></div>
+            <div class="kpi-card" style="border-top-color: #F39C12;"><h3>기준월 매출이익</h3><p id="main-kpi-gp">-</p><div class="yoy-badge" id="main-kpi-mom-gp" style="margin-top: 5px;">-</div><div class="sub-kpi">이익률: <b id="main-kpi-gp-rate">-</b></div></div>
           </div>
           
           <div class="kpi-grid" style="grid-template-columns: 1fr 1fr;">
@@ -93,12 +93,12 @@
           </div>
         </div>
 
-        <!-- 🌟 2. 팀별 연간 리포트 뷰 (파스텔톤 적용) -->
+        <!-- 🌟 2. 팀별 연간 리포트 뷰 -->
         <div id="view-summary" style="display: none; flex-direction: column; gap: 20px;">
           <div class="kpi-grid">
-            <div class="kpi-card" style="border-top-color: #A0C4FF;"><h3>연간 누계 총 매출액</h3><p id="sum-kpi-rev">-</p><div class="yoy-badge" id="sum-kpi-yoy-rev">-</div></div>
-            <div class="kpi-card" style="border-top-color: #BDB2FF;"><h3>연간 누계 공헌이익</h3><p id="sum-kpi-cm">-</p><div class="sub-kpi">이익률: <b id="sum-kpi-cm-rate">-</b></div></div>
-            <div class="kpi-card" style="border-top-color: #FFADAD;"><h3>연간 누계 매출이익</h3><p id="sum-kpi-gp">-</p><div class="yoy-badge" id="sum-kpi-yoy-gp" style="margin-top: 5px;">-</div><div class="sub-kpi">이익률: <b id="sum-kpi-gp-rate">-</b></div></div>
+            <div class="kpi-card" style="border-top-color: #2E79B5;"><h3>연간 누계 총 매출액</h3><p id="sum-kpi-rev">-</p><div class="yoy-badge" id="sum-kpi-yoy-rev">-</div></div>
+            <div class="kpi-card" style="border-top-color: #00A6B2;"><h3>연간 누계 공헌이익</h3><p id="sum-kpi-cm">-</p><div class="sub-kpi">이익률: <b id="sum-kpi-cm-rate">-</b></div></div>
+            <div class="kpi-card" style="border-top-color: #F39C12;"><h3>연간 누계 매출이익</h3><p id="sum-kpi-gp">-</p><div class="yoy-badge" id="sum-kpi-yoy-gp" style="margin-top: 5px;">-</div><div class="sub-kpi">이익률: <b id="sum-kpi-gp-rate">-</b></div></div>
           </div>
           
           <div class="chart-layout" style="grid-template-columns: 1.5fr 1fr;">
@@ -123,7 +123,7 @@
           </div>
         </div>
 
-        <!-- 🌟 3. 화주사별 카드 뷰 (기존 디자인 롤백) -->
+        <!-- 🌟 3. 화주사별 카드 뷰 -->
         <div id="view-cards" style="display: none;">
           <div class="box-header" style="margin-bottom: 20px;">
             <h4>화주사별 요약 카드</h4><span class="subtitle">해당 기준월의 실적입니다. 카드를 클릭하면 연간 상세 분석을 볼 수 있습니다.</span>
@@ -134,7 +134,7 @@
           <div id="card-container-new" class="card-grid"></div>
         </div>
 
-        <!-- 🌟 4. 화주사 상세 분석 뷰 (기존 디자인 롤백) -->
+        <!-- 🌟 4. 화주사 상세 분석 뷰 -->
         <div id="view-detail" style="display: none; flex-direction: column; gap: 20px;">
           <div class="detail-header">
             <button class="btn-back" onclick="goBackToCards()">← 목록으로 돌아가기</button>
@@ -143,7 +143,7 @@
           </div>
           
           <div class="kpi-grid">
-            <div class="kpi-card" style="border-top-color: #4A90E2;"><h3>연간 총 매출</h3><p id="det-kpi-rev">-</p><div class="yoy-badge" id="det-kpi-yoy-rev">-</div></div>
+            <div class="kpi-card" style="border-top-color: #2E79B5;"><h3>연간 총 매출</h3><p id="det-kpi-rev">-</p><div class="yoy-badge" id="det-kpi-yoy-rev">-</div></div>
             <div class="kpi-card" style="border-top-color: #00A6B2;"><h3>연간 공헌이익</h3><p id="det-kpi-cm">-</p><div class="sub-kpi">이익률: <b id="det-kpi-cm-rate">-</b></div></div>
             <div class="kpi-card" style="border-top-color: #F39C12;"><h3>연간 매출이익</h3><p id="det-kpi-gp">-</p><div class="yoy-badge" id="det-kpi-yoy-gp" style="margin-top: 5px;">-</div><div class="sub-kpi">이익률: <b id="det-kpi-gp-rate">-</b></div></div>
           </div>
@@ -177,7 +177,6 @@
       </div>
     </div>
   </div>
-
-  <script src="script.js?v=31" defer></script>
+  <script src="script.js?v=32" defer></script>
 </body>
 </html>
