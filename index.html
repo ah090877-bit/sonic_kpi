@@ -49,7 +49,7 @@
 
       <div class="scroll-area">
         
-        <!-- 🌟 주요 경영 지표 (인사이트 뷰) -->
+        <!-- 🌟 1. 주요 경영 지표 (인사이트 뷰) -->
         <div id="view-main" style="display: none; flex-direction: column; gap: 20px;">
           <div class="box-header"><h4 id="main-title-text">경영 인사이트</h4><span class="subtitle">선택한 기준월의 전월 대비(MoM) 실적 요약 및 특이사항입니다.</span></div>
           
@@ -70,26 +70,22 @@
             </div>
           </div>
 
-          <!-- 1. 매출 기준 분석 -->
           <div class="chart-layout" style="grid-template-columns: 1fr 1fr;">
             <div class="chart-box large-chart"><div class="box-header"><h4>팀별 매출액 전월 비교</h4></div><div class="canvas-wrap"><canvas id="main-chart-team-rev"></canvas></div></div>
             <div class="table-container" style="height:420px; overflow-y:auto; margin:0;">
               <div class="box-header"><h4>매출액 실적 급변 화주사 Top 5 (전월비)</h4></div>
               <table class="data-table" style="min-width: 100%;">
-                <!-- ★ 헤더 순서 변경 (전월 -> 당월) -->
                 <thead><tr><th>화주사명</th><th>전월 매출</th><th>기준월 매출</th><th>증감률</th><th>증감액</th></tr></thead>
                 <tbody id="main-table-body-rev"></tbody>
               </table>
             </div>
           </div>
           
-          <!-- 2. 매출이익 기준 분석 -->
           <div class="chart-layout" style="grid-template-columns: 1fr 1fr;">
             <div class="chart-box large-chart"><div class="box-header"><h4>팀별 매출이익 전월 비교</h4></div><div class="canvas-wrap"><canvas id="main-chart-team-gp"></canvas></div></div>
             <div class="table-container" style="height:420px; overflow-y:auto; margin:0;">
               <div class="box-header"><h4>매출이익 실적 급변 화주사 Top 5 (전월비)</h4></div>
               <table class="data-table" style="min-width: 100%;">
-                <!-- ★ 헤더 순서 변경 (전월 -> 당월) -->
                 <thead><tr><th>화주사명</th><th>전월 매출이익</th><th>기준월 매출이익</th><th>증감률</th><th>증감액</th></tr></thead>
                 <tbody id="main-table-body-gp"></tbody>
               </table>
@@ -97,17 +93,20 @@
           </div>
         </div>
 
-        <!-- 2. 팀별 요약 뷰 -->
+        <!-- 🌟 2. 팀별 연간 리포트 뷰 -->
         <div id="view-summary" style="display: none; flex-direction: column; gap: 20px;">
           <div class="kpi-grid">
             <div class="kpi-card" style="border-top-color: #4A90E2;"><h3>연간 누계 총 매출액</h3><p id="sum-kpi-rev">-</p><div class="yoy-badge" id="sum-kpi-yoy-rev">-</div></div>
             <div class="kpi-card" style="border-top-color: #00A6B2;"><h3>연간 누계 공헌이익</h3><p id="sum-kpi-cm">-</p><div class="sub-kpi">이익률: <b id="sum-kpi-cm-rate">-</b></div></div>
             <div class="kpi-card" style="border-top-color: #F39C12;"><h3>연간 누계 매출이익</h3><p id="sum-kpi-gp">-</p><div class="yoy-badge" id="sum-kpi-yoy-gp" style="margin-top: 5px;">-</div><div class="sub-kpi">이익률: <b id="sum-kpi-gp-rate">-</b></div></div>
           </div>
-          <div class="chart-layout" style="grid-template-columns: 1fr 1fr;">
-            <div class="chart-box large-chart"><div class="box-header"><h4>전년 대비 당해 연도 매출 추이</h4></div><div class="canvas-wrap"><canvas id="sum-chart-trend"></canvas></div></div>
-            <div class="chart-box large-chart"><div class="box-header"><h4>연간 누계 비용 및 이익 구조</h4></div><div class="canvas-wrap"><canvas id="sum-chart-cost"></canvas></div></div>
+          
+          <!-- ★ 누적 막대 차트를 위해 비율 1.5 : 1 조정 및 이익률 차트 추가 -->
+          <div class="chart-layout" style="grid-template-columns: 1.5fr 1fr;">
+            <div class="chart-box large-chart"><div class="box-header"><h4>전년 대비 당해 연도 원가/이익 구조 추이</h4><span class="subtitle">막대는 '매출이익+고정원가+변동원가'로 구성된 당해 매출액입니다.</span></div><div class="canvas-wrap"><canvas id="sum-chart-trend"></canvas></div></div>
+            <div class="chart-box large-chart"><div class="box-header"><h4>월별 이익률(%) 추이</h4></div><div class="canvas-wrap"><canvas id="sum-chart-margin"></canvas></div></div>
           </div>
+
           <div class="table-container">
             <div class="box-header">
               <h4 id="table-title">월별 실적 리포트 (1~12월)</h4>
@@ -177,34 +176,6 @@
     </div>
   </div>
 
-  <!-- 신규/기존 분리 팝업 모달 -->
-  <div id="split-modal" class="modal">
-    <div class="modal-content" style="max-width: 900px;">
-      <span class="close-btn" onclick="closeSplitModal()">&times;</span>
-      <div class="modal-header">
-        <h2 id="split-modal-title">월별 신규/기존 분할 리포트</h2>
-        <span id="split-modal-subtitle" class="modal-subtitle"></span>
-      </div>
-      
-      <div class="kpi-grid" style="margin-top:20px;">
-        <div class="kpi-card" style="border-top-color:#00A6B2;"><h3>🟢 기존 사업 매출</h3><p id="mod-exist-rev">-</p></div>
-        <div class="kpi-card" style="border-top-color:#F39C12;"><h3>🔴 신규 사업 매출</h3><p id="mod-new-rev">-</p></div>
-      </div>
-
-      <div class="table-scroll" style="margin-top:20px;">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>구분</th><th>당기 매출</th><th>운송수입</th><th>지입료수입</th><th>변동원가</th>
-              <th>공헌이익</th><th>공헌이익률</th><th>고정원가</th><th>매출이익</th><th>매출이익률</th>
-            </tr>
-          </thead>
-          <tbody id="split-modal-tbody"></tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-
-  <script src="script.js?v=25" defer></script>
+  <script src="script.js?v=27" defer></script>
 </body>
 </html>
