@@ -1,4 +1,4 @@
-// ★ 반드시 최신 발급받은 URL을 붙여넣으세요!
+// ★ 반드시 최신 발급받은 웹앱 URL을 입력해주세요!
 const API_URL = 'https://script.google.com/macros/s/AKfycbxoRToFFWcjmzjxxYkvPHourAy9C3FxTBWzoASIgiKBWkyofecavJCVyCo8hRy306gq/exec';
 
 let rawData = [];
@@ -15,7 +15,6 @@ function login() {
   
   errBox.style.display = 'none';
   document.getElementById('login-container').style.display = 'none';
-  
   fetchData(); 
   
   fetch(`${API_URL}?action=login&id=${id}&pw=${pw}`)
@@ -37,17 +36,13 @@ function login() {
 function fetchData() {
   const loader = document.getElementById('loader');
   const app = document.getElementById('app');
-  
   loader.style.display = 'flex';
   document.getElementById('loader-text').innerText = '최신 경영 실적을 동기화 중입니다...';
   app.style.display = 'none';
   
-  fetch(API_URL)
-    .then(res => res.json())
-    .then(data => initApp(data))
-    .catch(err => {
-      loader.innerHTML = `<div style="background:#FFF1F0; padding:30px; border-radius:10px;"><h3 style="color:#CF1322;">🚨 연결 실패</h3><p>${err}</p></div>`;
-    });
+  fetch(API_URL).then(res => res.json()).then(data => initApp(data)).catch(err => {
+    loader.innerHTML = `<div style="background:#FFF1F0; padding:30px; border-radius:10px;"><h3 style="color:#CF1322;">🚨 연결 실패</h3><p>${err}</p></div>`;
+  });
 }
 
 function initApp(response) {
@@ -63,7 +58,6 @@ function initApp(response) {
   });
   
   rawData = fetchedData; 
-
   const years = [...new Set(rawData.map(d => d.y))].sort((a,b)=>b-a);
   if(years.length > 0) {
     state.year = years[0].toString();
@@ -72,7 +66,6 @@ function initApp(response) {
   }
   
   setupSidebar(); buildTopFilters(); updateDashboard();
-  
   document.getElementById('loader').style.display = 'none'; 
   document.getElementById('app').style.display = 'flex';
 }
@@ -109,7 +102,6 @@ function buildTopFilters() {
 function populateSelect(id, options, selected, addAll) {
   const el = document.getElementById(id); const key = id.replace('f-', '');
   let currentVal = state[key]; 
-  
   const strOptions = options.map(String);
   if (currentVal !== 'All' && !strOptions.includes(String(currentVal))) {
     currentVal = addAll ? 'All' : (options.length > 0 ? String(options[0]) : ''); 
@@ -122,10 +114,7 @@ function populateSelect(id, options, selected, addAll) {
     if (String(opt) === String(currentVal)) option.selected = true; el.appendChild(option);
   });
   
-  el.onchange = (e) => {
-    state[key] = e.target.value;
-    buildTopFilters(); updateDashboard();
-  };
+  el.onchange = (e) => { state[key] = e.target.value; buildTopFilters(); updateDashboard(); };
 }
 
 function updateDashboard() {
@@ -186,7 +175,7 @@ function applyYoYBadge(elementId, currVal, prevVal, prefix = '전년비') {
   else { el.innerText = `${prefix} -`; el.className = 'yoy-badge yoy-none'; }
 }
 
-// 🌟 1. 경영 인사이트
+// 🌟 1. 주요 경영 지표 (인사이트)
 function renderMainDashboard() {
   const currYear = parseInt(state.year);
   let targetMonth = state.month === 'All' ? Math.max(...rawData.filter(d => d.y === currYear).map(d => d.m)) : parseInt(state.month);
@@ -228,9 +217,7 @@ function renderMainDashboard() {
   const clients = Object.values(clientMap);
   clients.forEach(c => {
     c.revDiff = c.tRev - c.pRev;
-    c.tGp = c.tRev - c.tVar - c.tFix;
-    c.pGp = c.pRev - c.pVar - c.pFix;
-    c.gpDiff = c.tGp - c.pGp;
+    c.tGp = c.tRev - c.tVar - c.tFix; c.pGp = c.pRev - c.pVar - c.pFix; c.gpDiff = c.tGp - c.pGp;
   });
   
   const revSorted = [...clients].sort((a,b) => b.revDiff - a.revDiff);
@@ -247,37 +234,33 @@ function renderMainDashboard() {
     let c = revSorted[revSorted.length-1];
     worstHTML = `<div class="insight-val">${c.name}</div><div class="insight-desc">전월 대비 매출액 ${formatMoney(Math.abs(c.revDiff))}원 하락 (▼${c.pRev===0?'100':Math.abs(getRatio(c.tRev, c.pRev)).toFixed(1)}%)</div>`;
   }
-  document.getElementById('insight-best').innerHTML = bestHTML;
-  document.getElementById('insight-worst').innerHTML = worstHTML;
+  document.getElementById('insight-best').innerHTML = bestHTML; document.getElementById('insight-worst').innerHTML = worstHTML;
 
   const teamMap = {};
   tData.forEach(d => { 
     if(!teamMap[d.team]) teamMap[d.team]={ tRev:0, pRev:0, tVar:0, pVar:0, tFix:0, pFix:0 }; 
-    if(d.type==='매출') teamMap[d.team].tRev += d.amt; 
-    else if(d.type==='변동원가') teamMap[d.team].tVar += d.amt; 
-    else if(d.type==='고정원가') teamMap[d.team].tFix += d.amt; 
+    if(d.type==='매출') teamMap[d.team].tRev += d.amt; else if(d.type==='변동원가') teamMap[d.team].tVar += d.amt; else if(d.type==='고정원가') teamMap[d.team].tFix += d.amt; 
   });
   pData.forEach(d => { 
     if(!teamMap[d.team]) teamMap[d.team]={ tRev:0, pRev:0, tVar:0, pVar:0, tFix:0, pFix:0 }; 
-    if(d.type==='매출') teamMap[d.team].pRev += d.amt; 
-    else if(d.type==='변동원가') teamMap[d.team].pVar += d.amt; 
-    else if(d.type==='고정원가') teamMap[d.team].pFix += d.amt; 
+    if(d.type==='매출') teamMap[d.team].pRev += d.amt; else if(d.type==='변동원가') teamMap[d.team].pVar += d.amt; else if(d.type==='고정원가') teamMap[d.team].pFix += d.amt; 
   });
   const teamLabels = Object.keys(teamMap);
   
+  // ★ 세련된 기업 컬러 적용 (퍼플 #6C5CE7, 라이트퍼플 #A29BFE)
   renderChart('main-chart-team-rev', 'bar', {
     labels: teamLabels,
     datasets: [
-      { label: `${prevMonth}월 전월 매출`, data: teamLabels.map(t => teamMap[t].pRev), backgroundColor: '#DEE2E6', borderRadius: 4 },
-      { label: `${targetMonth}월 기준월 매출`, data: teamLabels.map(t => teamMap[t].tRev), backgroundColor: '#00A6B2', borderRadius: 4 }
+      { label: `${prevMonth}월 전월 매출`, data: teamLabels.map(t => teamMap[t].pRev), backgroundColor: '#E2E8F0', borderRadius: 4 },
+      { label: `${targetMonth}월 기준월 매출`, data: teamLabels.map(t => teamMap[t].tRev), backgroundColor: '#6C5CE7', borderRadius: 4 }
     ]
   });
 
   renderChart('main-chart-team-gp', 'bar', {
     labels: teamLabels,
     datasets: [
-      { label: `${prevMonth}월 전월 매출이익`, data: teamLabels.map(t => (teamMap[t].pRev - teamMap[t].pVar - teamMap[t].pFix)), backgroundColor: '#F8D7DA', borderRadius: 4 },
-      { label: `${targetMonth}월 기준월 매출이익`, data: teamLabels.map(t => (teamMap[t].tRev - teamMap[t].tVar - teamMap[t].tFix)), backgroundColor: '#F39C12', borderRadius: 4 }
+      { label: `${prevMonth}월 전월 매출이익`, data: teamLabels.map(t => (teamMap[t].pRev - teamMap[t].pVar - teamMap[t].pFix)), backgroundColor: '#E2E8F0', borderRadius: 4 },
+      { label: `${targetMonth}월 기준월 매출이익`, data: teamLabels.map(t => (teamMap[t].tRev - teamMap[t].tVar - teamMap[t].tFix)), backgroundColor: '#00B894', borderRadius: 4 }
     ]
   });
 
@@ -288,11 +271,7 @@ function renderMainDashboard() {
     let ratio = getRatio(c.tRev, c.pRev);
     let txt = ratio === null ? '-' : (ratio > 0 ? `▲ ${ratio.toFixed(1)}%` : (ratio < 0 ? `▼ ${Math.abs(ratio).toFixed(1)}%` : '-'));
     let color = ratio === null ? 'inherit' : (ratio > 0 ? '#2E7D32' : (ratio < 0 ? '#C62828' : 'inherit'));
-    revBody.innerHTML += `<tr><td class="text-center" style="font-weight:900;">${c.name}</td>
-      <td style="color:#6C757D;">${formatMoney(c.pRev)}</td>
-      <td style="font-weight:700;">${formatMoney(c.tRev)}</td>
-      <td style="color:${color}; font-weight:900;">${txt}</td>
-      <td style="color:${color};">${(c.revDiff > 0)?'+':''}${formatMoney(c.revDiff)}</td></tr>`;
+    revBody.innerHTML += `<tr><td class="text-center" style="font-weight:900;">${c.name}</td><td style="color:#6C757D;">${formatMoney(c.pRev)}</td><td style="font-weight:700;">${formatMoney(c.tRev)}</td><td style="color:${color}; font-weight:900;">${txt}</td><td style="color:${color};">${(c.revDiff > 0)?'+':''}${formatMoney(c.revDiff)}</td></tr>`;
   });
 
   const gpBody = document.getElementById('main-table-body-gp'); gpBody.innerHTML = '';
@@ -302,20 +281,15 @@ function renderMainDashboard() {
     let ratio = getRatio(c.tGp, c.pGp);
     let txt = ratio === null ? '-' : (ratio > 0 ? `▲ ${ratio.toFixed(1)}%` : (ratio < 0 ? `▼ ${Math.abs(ratio).toFixed(1)}%` : '-'));
     let color = ratio === null ? 'inherit' : (ratio > 0 ? '#2E7D32' : (ratio < 0 ? '#C62828' : 'inherit'));
-    gpBody.innerHTML += `<tr><td class="text-center" style="font-weight:900;">${c.name}</td>
-      <td style="color:#6C757D;">${formatMoney(c.pGp)}</td>
-      <td style="font-weight:700;">${formatMoney(c.tGp)}</td>
-      <td style="color:${color}; font-weight:900;">${txt}</td>
-      <td style="color:${color};">${(c.gpDiff > 0)?'+':''}${formatMoney(c.gpDiff)}</td></tr>`;
+    gpBody.innerHTML += `<tr><td class="text-center" style="font-weight:900;">${c.name}</td><td style="color:#6C757D;">${formatMoney(c.pGp)}</td><td style="font-weight:700;">${formatMoney(c.tGp)}</td><td style="color:${color}; font-weight:900;">${txt}</td><td style="color:${color};">${(c.gpDiff > 0)?'+':''}${formatMoney(c.gpDiff)}</td></tr>`;
   });
 }
 
-// 🌟 2. 팀별 리포트 뷰 (YTD 동기화 로직 및 매출 구조 스택 막대 그래프 적용)
+// 🌟 2. 팀별 연간 리포트 (매출 꺾은선 추가 및 색상 개편)
 function renderSummaryView() {
   const currYear = parseInt(state.year);
   const currData = rawData.filter(d => d.y === currYear && (state.hq === 'All' || d.hq === state.hq) && (state.team === 'All' || d.team === state.team));
   
-  // ★ YoY 동기화 로직: 현재 연도의 '최대 월(Max Month)'까지만 작년 데이터를 필터링합니다. (예: 올해가 9월까지면, 작년도 1~9월까지만 추출)
   const maxDbMonth = currData.length > 0 ? Math.max(...currData.map(d => d.m)) : 12;
   const prevData = rawData.filter(d => d.y === currYear - 1 && d.m <= maxDbMonth && (state.hq === 'All' || d.hq === state.hq) && (state.team === 'All' || d.team === state.team));
 
@@ -338,24 +312,23 @@ function renderSummaryView() {
     else if (d.type === '고정원가') { mCurrFix[i] += d.amt; mCurrGP[i] -= d.amt; }
   });
   
-  // 차트용 전체 12개월 전년 데이터 로드 (그래프는 1~12월 다 보여주는 게 자연스러움)
   const prevDataAll = rawData.filter(d => d.y === currYear - 1 && (state.hq === 'All' || d.hq === state.hq) && (state.team === 'All' || d.team === state.team));
   prevDataAll.forEach(d => { if (d.type === '매출') mPrevRev[d.m - 1] += d.amt; });
 
-  // ★ 누적(Stacked) 막대 + 꺾은선 복합 차트 적용
+  // ★ 색상 개편 및 당해 총매출액을 보여주는 '꺾은선 차트' 추가
   renderChart('sum-chart-trend', 'bar', {
     labels: ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'],
     datasets: [
-      { type: 'line', label: `${currYear - 1}년 전체 매출`, data: mPrevRev, borderColor: '#B0BEC5', tension: 0.3, borderWidth: 2, borderDash: [5,5], fill: false },
-      { type: 'bar', label: `매출이익`, data: mCurrGP, backgroundColor: '#F39C12', stack: 'Stack0' },
-      { type: 'bar', label: `고정원가`, data: mCurrFix, backgroundColor: '#DEE2E6', stack: 'Stack0' },
-      { type: 'bar', label: `변동원가`, data: mCurrVar, backgroundColor: '#2E79B5', stack: 'Stack0' }
+      { type: 'line', label: `${currYear}년 총매출 (추이)`, data: mCurrRev, borderColor: '#6C5CE7', backgroundColor: '#6C5CE7', tension: 0.2, borderWidth: 3, pointRadius: 4, fill: false }, // ★ 새로 추가된 당해 매출 꺾은선
+      { type: 'line', label: `${currYear - 1}년 총매출`, data: mPrevRev, borderColor: '#CED4DA', tension: 0.3, borderWidth: 2, borderDash: [5,5], pointRadius: 0, fill: false },
+      { type: 'bar', label: `매출이익`, data: mCurrGP, backgroundColor: '#FDCB6E', stack: 'Stack0' },
+      { type: 'bar', label: `고정원가`, data: mCurrFix, backgroundColor: '#E2E8F0', stack: 'Stack0' },
+      { type: 'bar', label: `변동원가`, data: mCurrVar, backgroundColor: '#0984E3', stack: 'Stack0' }
     ]
   }, {
     scales: { x: { stacked: true }, y: { stacked: true } }
   });
   
-  // ★ 신규: 팀별 이익률(%) 트렌드
   const safeRate = (profit, rev) => rev === 0 ? null : (profit / rev) * 100;
   const capVal = (val) => { if(val === null) return null; if(val > 150) return 150; if(val < -150) return -150; return val; };
 
@@ -363,17 +336,16 @@ function renderSummaryView() {
   const realCurrCMRate = Array(12).fill(null), realCurrGPRate = Array(12).fill(null);
 
   for(let i=0; i<12; i++) {
-    realCurrCMRate[i] = safeRate(mCurrCM[i], mCurrRev[i]);
-    realCurrGPRate[i] = safeRate(mCurrGP[i], mCurrRev[i]);
-    mCurrCMRate[i] = capVal(realCurrCMRate[i]);
-    mCurrGPRate[i] = capVal(realCurrGPRate[i]);
+    realCurrCMRate[i] = safeRate(mCurrCM[i], mCurrRev[i]); realCurrGPRate[i] = safeRate(mCurrGP[i], mCurrRev[i]);
+    mCurrCMRate[i] = capVal(realCurrCMRate[i]); mCurrGPRate[i] = capVal(realCurrGPRate[i]);
   }
 
+  // ★ 이익률 색상 퍼플/시안 톤 적용
   renderChart('sum-chart-margin', 'line', {
     labels: ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'],
     datasets: [
-      { label: `공헌이익률(%)`, data: mCurrCMRate, realData: realCurrCMRate, borderColor: '#00A6B2', tension: 0.3, borderWidth: 3, spanGaps: true },
-      { label: `매출이익률(%)`, data: mCurrGPRate, realData: realCurrGPRate, borderColor: '#F39C12', tension: 0.3, borderWidth: 3, spanGaps: true }
+      { label: `공헌이익률(%)`, data: mCurrCMRate, realData: realCurrCMRate, borderColor: '#00B894', tension: 0.3, borderWidth: 3, spanGaps: true },
+      { label: `매출이익률(%)`, data: mCurrGPRate, realData: realCurrGPRate, borderColor: '#FDCB6E', tension: 0.3, borderWidth: 3, spanGaps: true }
     ]
   }, {
     scales: { y: { suggestedMin: -20, suggestedMax: 20, ticks: { stepSize: 5, callback: v => v + '%' } } },
@@ -400,7 +372,7 @@ function renderSummaryView() {
     
     const tr = document.createElement('tr'); 
     tr.className = 'clickable-row'; 
-    tr.innerHTML = `<td class="text-center" style="font-weight:900; color:#4A90E2;">${m}월 ▾</td><td style="font-weight:900;">${formatMoney(cRev)}</td><td style="color:#6C757D;">${formatMoney(pRev)}</td><td style="color:${yoyColor}; font-weight:900;">${yoyTxt}</td><td>${formatMoney(cTrans)}</td><td>${formatMoney(cLease)}</td><td>${formatMoney(cVar)}</td><td style="color:#00A6B2; font-weight:900;">${formatMoney(cm)}</td><td style="font-size:12px; color:#6C757D;">${cmRatio.toFixed(1)}%</td><td>${formatMoney(cFix)}</td><td style="color:${gp < 0 ? '#DC3545' : '#212529'}; font-weight:900;">${formatMoney(gp)}</td><td style="font-size:12px; color:#6C757D;">${gpRatio.toFixed(1)}%</td>`;
+    tr.innerHTML = `<td class="text-center" style="font-weight:900; color:#6C5CE7;">${m}월 ▾</td><td style="font-weight:900;">${formatMoney(cRev)}</td><td style="color:#6C757D;">${formatMoney(pRev)}</td><td style="color:${yoyColor}; font-weight:900;">${yoyTxt}</td><td>${formatMoney(cTrans)}</td><td>${formatMoney(cLease)}</td><td>${formatMoney(cVar)}</td><td style="color:#00B894; font-weight:900;">${formatMoney(cm)}</td><td style="font-size:12px; color:#6C757D;">${cmRatio.toFixed(1)}%</td><td>${formatMoney(cFix)}</td><td style="color:${gp < 0 ? '#DC3545' : '#212529'}; font-weight:900;">${formatMoney(gp)}</td><td style="font-size:12px; color:#6C757D;">${gpRatio.toFixed(1)}%</td>`;
     
     const dExist = cData.filter(d => d.isNew !== '신규'); const dNew = cData.filter(d => d.isNew === '신규');
     const stE = calculateStats(dExist); const stN = calculateStats(dNew);
@@ -408,28 +380,23 @@ function renderSummaryView() {
     const makeSubHtml = (title, st, color) => {
       if(st.revTotal === 0 && st.varC === 0 && st.fixC === 0) return '';
       const cmRate = st.revTotal===0 ? 0 : (st.cm/st.revTotal)*100; const gpRate = st.revTotal===0 ? 0 : (st.gp/st.revTotal)*100;
-      return `<td class="text-center" style="color:${color};">└ ${title}</td><td style="font-weight:700;">${formatMoney(st.revTotal)}</td><td>-</td><td>-</td><td>${formatMoney(st.revTrans)}</td><td>${formatMoney(st.revLease)}</td><td>${formatMoney(st.varC)}</td><td style="color:#00A6B2;">${formatMoney(st.cm)}</td><td style="font-size:12px;">${cmRate.toFixed(1)}%</td><td>${formatMoney(st.fixC)}</td><td style="color:${st.gp < 0 ? '#DC3545' : '#212529'};">${formatMoney(st.gp)}</td><td style="font-size:12px;">${gpRate.toFixed(1)}%</td>`;
+      return `<td class="text-center" style="color:${color};">└ ${title}</td><td style="font-weight:700;">${formatMoney(st.revTotal)}</td><td>-</td><td>-</td><td>${formatMoney(st.revTrans)}</td><td>${formatMoney(st.revLease)}</td><td>${formatMoney(st.varC)}</td><td style="color:#00B894;">${formatMoney(st.cm)}</td><td style="font-size:12px;">${cmRate.toFixed(1)}%</td><td>${formatMoney(st.fixC)}</td><td style="color:${st.gp < 0 ? '#DC3545' : '#212529'};">${formatMoney(st.gp)}</td><td style="font-size:12px;">${gpRate.toFixed(1)}%</td>`;
     }
-
     const subTr1 = document.createElement('tr'); subTr1.className = `sub-row sub-${m}`; subTr1.innerHTML = makeSubHtml('기존 사업', stE, '#2E7D32');
     const subTr2 = document.createElement('tr'); subTr2.className = `sub-row sub-${m}`; subTr2.innerHTML = makeSubHtml('신규 사업', stN, '#C62828');
 
-    tr.onclick = () => {
-      document.querySelectorAll(`.sub-${m}`).forEach(sr => { if(sr.innerHTML !== '') sr.classList.toggle('active'); });
-    };
-
+    tr.onclick = () => { document.querySelectorAll(`.sub-${m}`).forEach(sr => { if(sr.innerHTML !== '') sr.classList.toggle('active'); }); };
     tbody.appendChild(tr); tbody.appendChild(subTr1); tbody.appendChild(subTr2);
   }
 }
 
-// 🌟 3. 화주사별 요약 카드 뷰
+// 🌟 3. 화주사 카드 뷰 (디자인 색상 적용)
 function renderCardGrid() {
   const currYear = parseInt(state.year);
   let targetMonth = state.month === 'All' ? Math.max(...rawData.filter(d => d.y === currYear).map(d => d.m)) : parseInt(state.month);
   if(!isFinite(targetMonth)) targetMonth = 1;
 
   const currData = rawData.filter(d => d.y === currYear && d.m === targetMonth && (state.hq === 'All' || d.hq === state.hq) && (state.team === 'All' || d.team === state.team));
-  
   const sumExist = {}, sumNew = {};
   currData.forEach(d => {
     const key = `${d.hq}|${d.team}|${d.client}`;
@@ -448,7 +415,6 @@ function renderCardGrid() {
       const totalRev = row.revTrans + row.revLease; if (totalRev === 0 && row.varC === 0 && row.fixC === 0) return;
       const cm = totalRev - row.varC; const cmRatio = totalRev === 0 ? 0 : (cm / totalRev) * 100;
       const gp = cm - row.fixC; const gpRatio = totalRev === 0 ? 0 : (gp / totalRev) * 100;
-
       const card = document.createElement('div'); card.className = 'client-card';
       card.onclick = () => { state.clientView = row.client; updateDashboard(); }; 
       card.innerHTML = `
@@ -457,10 +423,10 @@ function renderCardGrid() {
         <div class="card-row"><span>운송수입</span><span class="val">${formatMoney(row.revTrans)}</span></div>
         <div class="card-row"><span>지입료수입</span><span class="val">${formatMoney(row.revLease)}</span></div>
         <div class="card-row"><span>변동원가</span><span class="val">${formatMoney(row.varC)}</span></div>
-        <div class="card-row border-top"><span>공헌이익</span><span class="val ${cm < 0 ? 'txt-red' : ''}">${formatMoney(cm)}</span></div>
+        <div class="card-row border-top"><span style="color:#00B894; font-weight:bold;">공헌이익</span><span class="val ${cm < 0 ? 'txt-red' : ''}" style="color:#00B894;">${formatMoney(cm)}</span></div>
         <div class="card-row"><span>공헌이익률</span><span class="val ${cmRatio < 0 ? 'txt-red' : ''}">${cmRatio.toFixed(1)}%</span></div>
         <div class="card-row border-top"><span>고정원가</span><span class="val">${formatMoney(row.fixC)}</span></div>
-        <div class="card-row border-top highlight"><span>매출이익</span><span class="val ${gp < 0 ? 'txt-red' : ''}">${formatMoney(gp)}</span></div>
+        <div class="card-row border-top highlight"><span style="color:#FDCB6E; font-weight:bold;">매출이익</span><span class="val ${gp < 0 ? 'txt-red' : ''}" style="color:#FDCB6E;">${formatMoney(gp)}</span></div>
         <div class="card-row highlight"><span>매출이익률</span><span class="val ${gpRatio < 0 ? 'txt-red' : ''}">${gpRatio.toFixed(1)}%</span></div>
       `;
       container.appendChild(card);
@@ -469,14 +435,12 @@ function renderCardGrid() {
   buildCards(sumExist, 'card-container-exist'); buildCards(sumNew, 'card-container-new');
 }
 
-// 🌟 4. 화주사 상세 분석 뷰 (YTD 동기화 로직 적용) 🌟
+// 🌟 4. 화주사 상세 분석 뷰 (색상 개편 적용) 🌟
 function renderSingleClientDetail() {
   const currYear = parseInt(state.year);
   const clientName = state.clientView;
   
   const annualCurr = rawData.filter(d => d.y === currYear && d.client === clientName);
-  
-  // ★ YoY 동기화 로직: 현재 연도의 해당 화주사 '최대 월'까지만 작년 데이터를 필터링합니다.
   const maxDbMonth = annualCurr.length > 0 ? Math.max(...annualCurr.map(d => d.m)) : 12;
   const prevYtdData = rawData.filter(d => d.y === currYear - 1 && d.m <= maxDbMonth && d.client === clientName);
   
@@ -499,8 +463,6 @@ function renderSingleClientDetail() {
   const m2Rev = Array(12).fill(0), m2CM = Array(12).fill(0), m2GP = Array(12).fill(0);
   
   annualCurr.forEach(d => { const i = d.m-1; if(d.type==='매출'){ m1Rev[i]+=d.amt; m1CM[i]+=d.amt; m1GP[i]+=d.amt; } else if(d.type==='변동원가'){ m1CM[i]-=d.amt; m1GP[i]-=d.amt; } else if(d.type==='고정원가') m1GP[i]-=d.amt; });
-  
-  // 차트용 전체 12개월 전년 데이터
   const annualPrevAll = rawData.filter(d => d.y === currYear - 1 && d.client === clientName);
   annualPrevAll.forEach(d => { const i = d.m-1; if(d.type==='매출'){ m2Rev[i]+=d.amt; m2CM[i]+=d.amt; m2GP[i]+=d.amt; } else if(d.type==='변동원가'){ m2CM[i]-=d.amt; m2GP[i]-=d.amt; } else if(d.type==='고정원가') m2GP[i]-=d.amt; });
   
@@ -521,14 +483,14 @@ function renderSingleClientDetail() {
 
   renderChart('det-chart-yoy', 'bar', {
     labels: ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'],
-    datasets: [{ label: `${currYear-1}년 매출`, data: m2Rev, backgroundColor: '#DEE2E6', borderRadius: 4 }, { label: `${currYear}년 매출`, data: m1Rev, backgroundColor: '#00A6B2', borderRadius: 4 }]
+    datasets: [{ label: `${currYear-1}년 매출`, data: m2Rev, backgroundColor: '#E2E8F0', borderRadius: 4 }, { label: `${currYear}년 매출`, data: m1Rev, backgroundColor: '#6C5CE7', borderRadius: 4 }]
   });
 
   renderChart('det-chart-margin', 'line', {
     labels: ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'],
     datasets: [
-      { label: `${currYear} 공헌이익률`, data: chart1CM, realData: real1CM, borderColor: '#00A6B2', tension: 0.3, borderWidth: 3, spanGaps: true },
-      { label: `${currYear} 매출이익률`, data: chart1GP, realData: real1GP, borderColor: '#F39C12', tension: 0.3, borderWidth: 3, spanGaps: true },
+      { label: `${currYear} 공헌이익률`, data: chart1CM, realData: real1CM, borderColor: '#00B894', tension: 0.3, borderWidth: 3, spanGaps: true },
+      { label: `${currYear} 매출이익률`, data: chart1GP, realData: real1GP, borderColor: '#FDCB6E', tension: 0.3, borderWidth: 3, spanGaps: true },
       { label: `${currYear-1} 공헌이익률`, data: chart2CM, realData: real2CM, borderColor: '#B0BEC5', tension: 0.3, borderDash: [5,5], borderWidth: 2, spanGaps: true },
       { label: `${currYear-1} 매출이익률`, data: chart2GP, realData: real2GP, borderColor: '#E8A37E', tension: 0.3, borderDash: [5,5], borderWidth: 2, spanGaps: true }
     ]
@@ -561,13 +523,12 @@ function renderSingleClientDetail() {
       const gp = cm - cFix; const gpRatio = cRev === 0 ? 0 : (gp / cRev) * 100;
       
       const tr = document.createElement('tr'); 
-      tr.innerHTML = `<td class="text-center">${m}월</td><td style="font-weight:900;">${formatMoney(cRev)}</td><td style="color:#6C757D;">${formatMoney(pRev)}</td><td style="color:${yoyColor}; font-weight:900;">${yoyTxt}</td><td>${formatMoney(cTrans)}</td><td>${formatMoney(cLease)}</td><td>${formatMoney(cVar)}</td><td style="color:#00A6B2; font-weight:900;">${formatMoney(cm)}</td><td style="font-size:12px; color:#6C757D;">${cmRatio.toFixed(1)}%</td><td>${formatMoney(cFix)}</td><td style="color:${gp < 0 ? '#DC3545' : '#212529'}; font-weight:900;">${formatMoney(gp)}</td><td style="font-size:12px; color:#6C757D;">${gpRatio.toFixed(1)}%</td>`;
+      tr.innerHTML = `<td class="text-center">${m}월</td><td style="font-weight:900;">${formatMoney(cRev)}</td><td style="color:#6C757D;">${formatMoney(pRev)}</td><td style="color:${yoyColor}; font-weight:900;">${yoyTxt}</td><td>${formatMoney(cTrans)}</td><td>${formatMoney(cLease)}</td><td>${formatMoney(cVar)}</td><td style="color:#00B894; font-weight:900;">${formatMoney(cm)}</td><td style="font-size:12px; color:#6C757D;">${cmRatio.toFixed(1)}%</td><td>${formatMoney(cFix)}</td><td style="color:${gp < 0 ? '#DC3545' : '#212529'}; font-weight:900;">${formatMoney(gp)}</td><td style="font-size:12px; color:#6C757D;">${gpRatio.toFixed(1)}%</td>`;
       tbody.appendChild(tr);
     }
   }
-
   drawDetTable('기존', 'det-table-exist', 'detail-table-exist-wrap');
   drawDetTable('신규', 'det-table-new', 'detail-table-new-wrap');
 }
-
 function goBackToCards() { state.clientView = 'All'; updateDashboard(); }
+window.onload = fetchData;
